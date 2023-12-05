@@ -1,1 +1,212 @@
+<!--
 
+models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from .managers import *
+
+class CustomUser(AbstractUser):
+    username = None
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+
+    objects = CustomUserManager()
+
+    def __str__(self):
+        return self.email
+
+
+class Orders(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    order_number = models.CharField(max_length=255)
+    tracking_number = models.CharField(max_length=255)
+    borrowers_first_name = models.CharField(max_length=255)
+    borrowers_last_name = models.CharField(max_length=255)
+    additional_comments = models.TextField()
+    file_url = models.URLField()
+    entered_date = models.DateTimeField(null=True, blank=True)
+    closing_date = models.DateTimeField(null=True, blank=True)
+    disbursment_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    zipcode = models.CharField(max_length=10)
+
+class Check(models.Model):
+    CHECK_RECEIVED_CHOICES = [
+        ('yes', 'Yes'),
+        ('no', 'No'),
+        ('missing', 'Missing'),
+    ]
+    order = models.ForeignKey(Orders, on_delete=models.CASCADE,related_name='checks')
+    check_received = models.CharField(choices=CHECK_RECEIVED_CHOICES, max_length=10)
+    check_received_amount = models.IntegerField(null=True, blank=True)
+
+class Lender(models.Model):
+    LENDER_CHOICES = [
+        ('affinity', 'Affinity'),
+        ('boa', 'Bank of America'),
+        ('boa_heloc', 'Bank of America HELOC'),
+        # Add other choices
+    ]
+    order = models.OneToOneField(Orders, on_delete=models.CASCADE)
+    lender_type = models.CharField(choices=LENDER_CHOICES, max_length=20)
+
+class State(models.Model):
+    STATE_CHOICES = [
+        ('jharkhand', 'Jharkhand'),
+        ('bihar', 'Bihar'),
+        # Add other choices
+    ]
+    order = models.OneToOneField(Orders, on_delete=models.CASCADE)
+    state_type = models.CharField(choices=STATE_CHOICES, max_length=20)
+
+class County(models.Model):
+    COUNTY_CHOICES = [
+        ('ranchi', 'Ranchi'),
+        ('jamshedpur', 'Jamshedpur'),
+        # Add other choices
+    ]
+    state = models.ForeignKey(State, on_delete=models.CASCADE)
+    county_type = models.CharField(choices=COUNTY_CHOICES, max_length=20)
+
+
+managers.py
+# customuser/managers.py
+from django.contrib.auth.models import BaseUserManager
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, phone_number=None, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, phone_number=phone_number, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        return self.create_user(email, password, **extra_fields)
+
+
+serializers.py
+
+from rest_framework import serializers
+from .models import *
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = '__all__'
+
+class CustomUserCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ('email', 'phone_number', 'password')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = CustomUser.objects.create_user(**validated_data)
+        return user
+
+
+class CheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Check
+        fields = ('check_received', 'check_received_amount')
+
+    def validate(self, data):
+        check_received = data.get('check_received')
+        check_received_amount = data.get('check_received_amount')
+
+        if check_received == 'yes' and not check_received_amount:
+            raise serializers.ValidationError("check_received_amount is required when check_received is 'yes'.")
+
+        return data
+
+class OrdersSerializer(serializers.ModelSerializer):
+    check = CheckSerializer(many=True)
+    user = 1
+    class Meta:
+        model = Orders
+        fields = ('user','order_number', 'tracking_number', 'borrowers_first_name', 'borrowers_last_name', 'additional_comments', 'check')
+    
+    def create(self, validated_data):
+        check_data = validated_data.pop('check',None)
+        order_number = validated_data.get('order_number')
+        validated_data['user'] = validated_data.get('user')
+        existing_order = Orders.objects.filter(order_number=order_number).first()
+        if existing_order:
+            raise serializers.ValidationError({"order_number": ["Order with this order_number already exists."]})
+        
+        order = Orders.objects.create(**validated_data)
+        if check_data:
+            for check_data in check_data:
+                Check.objects.create(order=order, **check_data)
+        return order
+
+views.py
+from rest_framework import generics
+from rest_framework.response import Response
+from rest_framework import status
+from django.db.models import Prefetch
+
+from .models import *
+from .serializers import *
+
+class CustomUserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+
+class CustomUserCreateView(generics.CreateAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class OrdersListView(generics.ListAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersSerializer
+
+class OrdersCreateView(generics.CreateAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersSerializer
+
+
+urls.py
+
+from django.urls import path
+from .views import *
+
+urlpatterns = [
+    path('users/', CustomUserListView.as_view(), name='user-list'),
+    path('users/create/', CustomUserCreateView.as_view(), name='user-create'),
+    path('orders/create/', OrdersCreateView.as_view(), name='create-order'),
+    path('orders/list/', OrdersListView.as_view(), name='order-list'),
+]
+
+
+
+
+
+-->
+
+<html>
+  <body>
+    <h1> hey </h1>
+  </body>
+</html>

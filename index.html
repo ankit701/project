@@ -74,7 +74,7 @@ class County(models.Model):
     ]
     state = models.ForeignKey(State, on_delete=models.CASCADE)
     county_type = models.CharField(choices=COUNTY_CHOICES, max_length=20)
-
+--------------------------------------------------------------------------------------------
 
 managers.py
 # customuser/managers.py
@@ -95,7 +95,7 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
 
         return self.create_user(email, password, **extra_fields)
-
+--------------------------------------------------------------------------------------------------
 
 serializers.py
 
@@ -105,6 +105,17 @@ from .models import *
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
+        fields = '__all__'
+
+class CheckListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Check
+        fields = '__all__'
+
+        
+class OrdersListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Orders
         fields = '__all__'
 
 class CustomUserCreateSerializer(serializers.ModelSerializer):
@@ -153,6 +164,7 @@ class OrdersSerializer(serializers.ModelSerializer):
                 Check.objects.create(order=order, **check_data)
         return order
 
+---------------------------------------------------------------------
 views.py
 from rest_framework import generics
 from rest_framework.response import Response
@@ -180,11 +192,36 @@ class CustomUserCreateView(generics.CreateAPIView):
 
 class OrdersListView(generics.ListAPIView):
     queryset = Orders.objects.all()
-    serializer_class = OrdersSerializer
+    serializer_class = OrdersListSerializer
+
+    def get_queryset(self):
+        # Customize the queryset to include related Check data
+        return Orders.objects.prefetch_related('checks').all()
+
+    def get_check_data(self, order_id):
+        # Your logic to get Check data for a specific order
+        checks = Check.objects.filter(order_id=order_id).values('check_received', 'check_received_amount')
+        checks_list = list(checks)
+        return checks_list
+
+    def list(self, request, *args, **kwargs):
+        # Override the list method to customize serialized data
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        print(serializer)
+        # Customize serialized data to include Check details
+        for order_data in serializer.data:
+            print(order_data)
+            order_id = order_data['id']
+            check_data = self.get_check_data(order_id)
+            order_data['check'] = check_data
+
+        return Response(serializer.data)
 
 class OrdersCreateView(generics.CreateAPIView):
     queryset = Orders.objects.all()
     serializer_class = OrdersSerializer
+---------------------------------------------------------------------------------
 
 
 urls.py

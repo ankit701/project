@@ -201,6 +201,90 @@ urlpatterns = [
 
 
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# serializers.py
+from rest_framework import serializers
+from .models import Orders, Lender, State, County
+
+class LenderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lender
+        fields = ('lender_type',)
+
+class StateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = State
+        fields = ('state_type',)
+
+class CountySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = County
+        fields = ('county_type',)
+
+class OrdersPatchSerializer(serializers.ModelSerializer):
+    lender = LenderSerializer(required=False)
+    state = StateSerializer(required=False)
+    county = CountySerializer(required=False)
+
+    class Meta:
+        model = Orders
+        fields = ('entered_date', 'closing_date', 'disbursment_date', 'lender', 'state', 'county')
+
+    def update(self, instance, validated_data):
+        # Update the main Orders model fields
+        instance.entered_date = validated_data.get('entered_date', instance.entered_date)
+        instance.closing_date = validated_data.get('closing_date', instance.closing_date)
+        instance.disbursment_date = validated_data.get('disbursment_date', instance.disbursment_date)
+        instance.save()
+
+        # Update the related Lender, State, County models
+        lender_data = validated_data.get('lender')
+        state_data = validated_data.get('state')
+        county_data = validated_data.get('county')
+
+        if lender_data:
+            lender, created = Lender.objects.get_or_create(order=instance)
+            lender.lender_type = lender_data.get('lender_type')
+            lender.save()
+
+        if state_data:
+            state, created = State.objects.get_or_create(order=instance)
+            state.state_type = state_data.get('state_type')
+            state.save()
+
+        if county_data:
+            county, created = County.objects.get_or_create(state=state)
+            county.county_type = county_data.get('county_type')
+            county.save()
+
+        return instance
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+# views.py
+from rest_framework import generics
+from .models import Orders
+from .serializers import OrdersPatchSerializer
+
+class OrdersPatchView(generics.UpdateAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersPatchSerializer
+    lookup_field = 'order_number'  # Assuming order_number is unique
+
+    def get_object(self):
+        order_number = self.kwargs.get(self.lookup_field)
+        return self.queryset.get(order_number=order_number)
+
+
+-------------------------------------------------------------------------------------------------------------
+# urls.py
+from django.urls import path
+from .views import OrdersPatchView
+
+urlpatterns = [
+    path('orders/<str:order_number>/', OrdersPatchView.as_view(), name='orders-patch'),
+    # Add other URL patterns as needed
+]
 
 
 -->

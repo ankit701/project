@@ -1,5 +1,142 @@
 <!--
 
+---------------------------------------------------------------------------------------------------------
+# admin.py
+from django.contrib import admin
+from import_export.admin import ImportExportModelAdmin
+from .models import State, County
+from .resources import StateResource, CountyResource
+
+@admin.register(State)
+class StateAdmin(ImportExportModelAdmin):
+    resource_class = StateResource
+
+@admin.register(County)
+class CountyAdmin(ImportExportModelAdmin):
+    resource_class = CountyResource
+
+
+-------------------------------------------------------------------------------------------------------------------------
+# resources.py
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
+from .models import State, County
+
+class StateResource(resources.ModelResource):
+    class Meta:
+        model = State
+        fields = ('state_id', 'state_name')
+        import_id_fields = ('state_id',)
+
+class CountyResource(resources.ModelResource):
+    state = fields.Field(
+        column_name='state_id',
+        attribute='state',
+        widget=ForeignKeyWidget(State, 'state_id')
+    )
+
+    class Meta:
+        model = County
+        fields = ('county_id', 'county_name', 'state')
+        import_id_fields = ('county_id',)
+
+-------------------------------------------------------------------------------------------------------
+
+# models.py
+from django.db import models
+
+class State(models.Model):
+    state_id = models.AutoField(primary_key=True)
+    state_name = models.CharField(max_length=255)
+
+class County(models.Model):
+    county_id = models.AutoField(primary_key=True)
+    county_name = models.CharField(max_length=255)
+    state = models.ForeignKey(State, on_delete=models.CASCADE)
+
+
+------------------------------------------------------------------------------------------------------------
+INSTALLED_APPS = [
+    # ...
+    'import_export',
+    # ...
+]
+
+-------------------------------------------------------------------------------------------------------------
+pip install django-import-export
+
+--------------------------------------------------------------------------------------------------------------------
+# views.py
+from rest_framework.response import Response
+from rest_framework import status
+
+class OrdersPatchView(generics.UpdateAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersPatchSerializer
+    lookup_field = 'order_number'  # Assuming 'order_number' is part of the URL kwargs
+
+    def get_object(self):
+        order_number = self.kwargs.get(self.lookup_field)
+        status = self.kwargs.get('status')  # Assuming 'status' is part of the URL kwargs
+
+        # Add additional condition based on the 'status'
+        if status == 'manifest_pending':
+            return self.queryset.get(order_number=order_number, status='manifest pending')
+        elif status == 'not_yet_assigned':
+            return self.queryset.get(order_number=order_number, status='not yet assigned')
+        else:
+            # Return None or raise a 404 depending on your use case
+            return None
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Check if instance is None (order not found or invalid status)
+        if instance is None:
+            return Response({"error": "Invalid order_number or status."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+-------------------------------------------------------------------------------------------------------------------------------
+# serializers.py
+
+class OrdersPatchSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Orders
+        fields = ('entered_date', 'closing_date', 'disbursment_date', 'loan_number', 'lender', 'state', 'county', 'zipcode', 'status', 'assigned_to')
+
+    def update(self, instance, validated_data):
+        # Check the status and update the assigned_to field if needed
+        status = validated_data.get('status', instance.status)
+        if status == 'manifest pending':
+            # Update the main Orders model fields
+            instance.entered_date = validated_data.get('entered_date', instance.entered_date)
+            instance.closing_date = validated_data.get('closing_date', instance.closing_date)
+            instance.disbursment_date = validated_data.get('disbursment_date', instance.disbursment_date)
+            instance.loan_number = validated_data.get('loan_number', instance.loan_number)
+            instance.lender = validated_data.get('lender', instance.lender)
+            instance.state = validated_data.get('state', instance.state)
+            instance.county = validated_data.get('county', instance.county)
+            instance.zipcode = validated_data.get('zipcode', instance.zipcode)
+        elif status == 'not yet assigned':
+            # Update the assigned_to field
+            assigned_to = validated_data.get('assigned_to')
+            if assigned_to:
+                instance.assigned_to = assigned_to
+        else:
+            raise serializers.ValidationError(f"Invalid status: {status}.")
+
+        instance.save()
+        return instance
+
+
+----------------------------------------------------------------------------------------------------------------------------
 models.py
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -331,3 +468,440 @@ urlpatterns = [
     <h1> hey </h1>
   </body>
 </html>
+
+
+
+
+
+<!-- 
+
+
+tests.py
+
+# myapp/tests.py
+from django.test import TestCase
+from rest_framework.test import APITestCase
+from rest_framework import status
+from .models import CustomUser, Orders, Employee, Check
+
+class CustomUserTests(TestCase):
+    def test_create_user(self):
+        response = self.client.post('/api/users/create/', {
+            'email': 'test@example.com',
+            'phone_number': '1234567890',
+            'password': 'testpassword'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(CustomUser.objects.count(), 1)
+        user = CustomUser.objects.get()
+        self.assertEqual(user.email, 'test@example.com')
+
+class OrdersTests(APITestCase):
+    def setUp(self):
+        # Create a user for testing
+        self.user = CustomUser.objects.create(email='test@example.com', password='testpassword')
+        # Create an employee for testing
+        self.employee = Employee.objects.create(user=self.user, employee_id='123', designation='Test', process='Test', branch='Test', reporting_to=self.user)
+        
+    def test_create_order(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post('/api/orders/create/', {
+            'employee': self.employee.id,
+            'order_number': '123456',
+            'tracking_number': '789012',
+            'borrowers_first_name': 'John',
+            'borrowers_last_name': 'Doe',
+            'additional_comments': 'Some additional comments',
+            'check': [
+                {'check_received': 'yes', 'check_received_amount': 500},
+                {'check_received': 'yes', 'check_received_amount': 600}
+            ]
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Orders.objects.count(), 1)
+        order = Orders.objects.get()
+        self.assertEqual(order.order_number, '123456')
+
+    def test_list_orders(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/api/orders/list/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)  # Assuming no orders in the test database
+
+    # Add more tests as needed for other APIs
+
+
+--------------------------------------------------------------------------------------------------------
+
+# myapp/tests.py
+from django.test import TestCase
+from rest_framework.test import APITestCase
+from rest_framework import status
+from .models import CustomUser, Orders, Employee, Check
+
+class CustomUserTests(APITestCase):
+    def test_create_user(self):
+        response = self.client.post('/api/users/create/', {
+            'email': 'test@example.com',
+            'phone_number': '1234567890',
+            'password': 'testpassword'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(CustomUser.objects.count(), 1)
+        user = CustomUser.objects.get()
+        self.assertEqual(user.email, 'test@example.com')
+
+    def test_create_user_invalid_data(self):
+        response = self.client.post('/api/users/create/', {
+            'email': 'invalidemail',  # Invalid email format
+            'phone_number': '1234567890',
+            'password': 'testpassword'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(CustomUser.objects.count(), 0)
+
+class OrdersTests(APITestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create(email='test@example.com', password='testpassword')
+        self.employee = Employee.objects.create(user=self.user, employee_id='123', designation='Test', process='Test', branch='Test', reporting_to=self.user)
+        
+    def test_create_order(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post('/api/orders/create/', {
+            'employee': self.employee.id,
+            'order_number': '123456',
+            'tracking_number': '789012',
+            'borrowers_first_name': 'John',
+            'borrowers_last_name': 'Doe',
+            'additional_comments': 'Some additional comments',
+            'check': [
+                {'check_received': 'yes', 'check_received_amount': 500},
+                {'check_received': 'yes', 'check_received_amount': 600}
+            ]
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Orders.objects.count(), 1)
+        order = Orders.objects.get()
+        self.assertEqual(order.order_number, '123456')
+
+    def test_create_order_invalid_data(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post('/api/orders/create/', {
+            'employee': self.employee.id,
+            'order_number': 'invalid_order',  # Invalid order_number format
+            'tracking_number': '789012',
+            'borrowers_first_name': 'John',
+            'borrowers_last_name': 'Doe',
+            'additional_comments': 'Some additional comments',
+            'check': [
+                {'check_received': 'yes', 'check_received_amount': 500},
+                {'check_received': 'yes', 'check_received_amount': 600}
+            ]
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Orders.objects.count(), 0)
+
+    def test_list_orders(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/api/orders/list/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)  # Assuming no orders in the test database
+
+    # Add more tests as needed for other APIs
+------------------------------------------------------------------------------------------------------------------------------
+# myapp/tests.py
+# ...
+
+class OrdersTests(APITestCase):
+    # ... (previous test cases)
+
+    def test_create_order_unauthenticated(self):
+        # Ensure creating an order without authentication returns 401 Unauthorized
+        response = self.client.post('/api/orders/create/', {
+            'employee': self.employee.id,
+            'order_number': '123456',
+            'tracking_number': '789012',
+            'borrowers_first_name': 'John',
+            'borrowers_last_name': 'Doe',
+            'additional_comments': 'Some additional comments',
+            'check': [
+                {'check_received': 'yes', 'check_received_amount': 500},
+                {'check_received': 'yes', 'check_received_amount': 600}
+            ]
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(Orders.objects.count(), 0)
+
+    def test_list_orders_with_checks(self):
+        # Ensure listing orders also includes check details
+        order = Orders.objects.create(
+            employee=self.employee,
+            order_number='123456',
+            tracking_number='789012',
+            borrowers_first_name='John',
+            borrowers_last_name='Doe',
+            additional_comments='Some additional comments'
+        )
+
+        Check.objects.create(order=order, check_received='yes', check_received_amount=500)
+        Check.objects.create(order=order, check_received='yes', check_received_amount=600)
+
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/api/orders/list/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data[0]['check']), 2)
+
+    def test_patch_order_manifest_pending(self):
+        # Ensure patching an order with 'manifest pending' status updates fields
+        order = Orders.objects.create(
+            employee=self.employee,
+            order_number='123456',
+            tracking_number='789012',
+            borrowers_first_name='John',
+            borrowers_last_name='Doe',
+            additional_comments='Some additional comments'
+        )
+
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(f'/api/orders/{order.order_number}/', {
+            'status': 'manifest pending',
+            'entered_date': '2023-01-01',
+            'closing_date': '2023-02-01',
+            'disbursment_date': '2023-03-01',
+            'loan_number': 12345,
+            'lender': 'Test Lender',
+            'state': 'California',
+            'county': 'Los Angeles',
+            'zipcode': '90001'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        updated_order = Orders.objects.get(pk=order.pk)
+        self.assertEqual(updated_order.entered_date, '2023-01-01')
+        self.assertEqual(updated_order.closing_date, '2023-02-01')
+        self.assertEqual(updated_order.disbursment_date, '2023-03-01')
+        self.assertEqual(updated_order.loan_number, 12345)
+        self.assertEqual(updated_order.lender, 'Test Lender')
+        self.assertEqual(updated_order.state, 'California')
+        self.assertEqual(updated_order.county, 'Los Angeles')
+        self.assertEqual(updated_order.zipcode, '90001')
+
+    def test_patch_order_not_assigned(self):
+        # Ensure patching an order with 'not yet assigned' status updates 'assigned_to'
+        order = Orders.objects.create(
+            employee=self.employee,
+            order_number='123456',
+            tracking_number='789012',
+            borrowers_first_name='John',
+            borrowers_last_name='Doe',
+            additional_comments='Some additional comments'
+        )
+
+        self.client.force_authenticate(self.user)
+        response = self.client.patch(f'/api/orders/{order.order_number}/', {
+            'status': 'not yet assigned',
+            'assigned_to': 'new_assignee@example.com'
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        updated_order = Orders.objects.get(pk=order.pk)
+        self.assertEqual(updated_order.assigned_to, 'new_assignee@example.com')
+
+    # Add more test cases as needed for other scenarios
+----------------------------------------------------------------------------------------------------------------------
+
+python manage.py test myapp.tests
+
+----------------------------------------+++++++++++++++++++++++++++++++++++++++++++++++=============================-----------------------------------------------------------
+
+
+# project_graphql/schema.py
+import graphene
+from graphene_django.types import DjangoObjectType
+from .models import Order
+import requests
+
+class OrderType(DjangoObjectType):
+    class Meta:
+        model = Order
+
+class Query(graphene.ObjectType):
+    all_orders = graphene.List(OrderType)
+
+    def resolve_all_orders(self, info):
+        return Order.objects.all()
+
+class FetchAndSaveOrdersMutation(graphene.Mutation):
+    class Arguments:
+        api_url = graphene.String(required=True)
+        params = graphene.JSONString(required=True)  # JSON string representing parameters to send to the API
+
+    success = graphene.Boolean()
+
+    def mutate(self, info, api_url, params):
+        try:
+            # Make a request to the specified API URL with the provided parameters
+            response = requests.get(api_url, params=params)
+            response.raise_for_status()  # Raise an error for HTTP errors
+
+            # Parse the JSON response assuming it is in the expected format
+            data = response.json()
+
+            # Update the Order model based on the fetched data
+            for order_data in data:
+                Order.objects.create(
+                    order_id=order_data.get('order_id'),
+                    tracking_number=order_data.get('tracking_number'),
+                    borrowers_first_name=order_data.get('borrowers_first_name'),
+                    borrowers_last_name=order_data.get('borrowers_last_name'),
+                    additional_comments=order_data.get('additional_comments'),
+                    # Add other fields as needed
+                )
+
+            success = True  # Set to True if the operation is successful
+        except Exception as e:
+            print(f"Error fetching and saving Orders: {str(e)}")
+            success = False
+
+        return FetchAndSaveOrdersMutation(success=success)
+
+class Mutation(graphene.ObjectType):
+    fetch_and_save_orders = FetchAndSaveOrdersMutation.Field()
+
+schema = graphene.Schema(query=Query, mutation=Mutation)
+
+
+----------------------------------------------------------------------------------------------------------------------------------------
+mutation {
+  fetch_and_save_orders(api_url: "http://example.com/api/orders", params: "{\"status\": \"shipped\", \"limit\": 10}") {
+    success
+  }
+}
+-------------------------------------------------------------------------------------------------
+
+mutation {
+  fetch_and_save_orders(api_url: "http://example.com/api/orders", ids: [1, 2, 3]) {
+    success
+  }
+}
+------------------------##############################################################################---------------------------------------------------------------------
+
+// EditOrder.js
+import React, { useState } from 'react';
+import { useMutation } from '@apollo/client';
+import gql from 'graphql-tag';
+
+const EDIT_ORDER = gql`
+  mutation EditOrder($api_url: String!, $params: String!) {
+    fetch_and_save_orders(api_url: $api_url, params: $params) {
+      success
+    }
+  }
+`;
+
+const EditOrder = ({ orderId, currentAmount }) => {
+  const [newAmount, setNewAmount] = useState(currentAmount);
+
+  const [editOrder] = useMutation(EDIT_ORDER);
+
+  const handleEdit = () => {
+    // Prepare the parameters for the API request
+    const params = JSON.stringify({
+      id: orderId,
+      amount: newAmount,
+      // Add other parameters as needed
+    });
+
+    // Define the API URL
+    const apiUrl = 'http://example.com/api/edit_order';
+
+    // Make the mutation request
+    editOrder({
+      variables: {
+        api_url: apiUrl,
+        params: params,
+      },
+    })
+      .then((response) => {
+        // Handle the response if needed
+        console.log(response);
+      })
+      .catch((error) => {
+        // Handle errors
+        console.error(error);
+      });
+  };
+
+  return (
+    <div>
+      <label htmlFor="newAmount">New Amount:</label>
+      <input
+        type="number"
+        id="newAmount"
+        value={newAmount}
+        onChange={(e) => setNewAmount(e.target.value)}
+      />
+      <button onClick={handleEdit}>Edit Order</button>
+    </div>
+  );
+};
+
+export default EditOrder;
+-----------------------------------------------------------------#################################################################-------------------------------------------
+
+// App.js
+import React from 'react';
+import { ApolloProvider, ApolloClient, InMemoryCache } from '@apollo/client';
+import EditOrder from './EditOrder';
+
+// Define your GraphQL endpoint
+const uri = 'http://localhost:8000/graphql/';
+
+const client = new ApolloClient({
+  uri,
+  cache: new InMemoryCache(),
+});
+
+const orders = [
+  // Sample order data
+  { id: 1, amount: 100 },
+  { id: 2, amount: 150 },
+  // Add more orders as needed
+];
+
+const App = () => {
+  return (
+    <ApolloProvider client={client}>
+      <div>
+        {orders.map((order) => (
+          <div key={order.id}>
+            <p>Order ID: {order.id}</p>
+            <p>Amount: {order.amount}</p>
+            <EditOrder orderId={order.id} currentAmount={order.amount} />
+            <hr />
+          </div>
+        ))}
+      </div>
+    </ApolloProvider>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+-->

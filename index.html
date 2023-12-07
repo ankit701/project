@@ -1,4 +1,43 @@
 <!--
+from django.core.files import File
+
+class OrdersPatchSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Orders
+        fields = ('entered_date', 'closing_date', 'disbursment_date', 'loan_number', 'lender', 'state', 'county', 'zipcode', 'status', 'assigned_to', 'file_adding', 'audit_additional_comment', 'audit_pass')
+
+    def update(self, instance, validated_data):
+        status = validated_data.get('status', instance.status)
+
+        if status == 'manifest pending':
+            # Update fields for 'manifest pending'
+            # ...
+
+        elif status == 'not yet assigned':
+            # Update 'assigned_to' field
+            # ...
+
+        elif status == 'audit in progress':
+            # Update fields for 'audit in progress'
+            # ...
+
+            # Handle file attachment
+            file_data = validated_data.get('file_adding')
+            if file_data:
+                # Save the file in the 'media' folder
+                with open(f'media/{file_data.name}', 'wb') as file:
+                    for chunk in file_data.chunks():
+                        file.write(chunk)
+
+                # Update the 'file_adding' field in the instance
+                instance.file_adding = f'http://127.0.0.1:8000/media/{file_data.name}'
+
+        else:
+            raise serializers.ValidationError(f"Invalid status: {status}.")
+
+        instance.save()
+        return instance
 
 ---------------------------------------------------------------------------------------------------------
 # admin.py

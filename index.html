@@ -1,5 +1,9 @@
 <!--
 
+
+
+check_list = models.FileField(upload_to='uploads/', null=True, blank=True)
+-----------------------------------------------------------------------------------------
 # urls.py
 
 from django.conf import settings
@@ -13,7 +17,7 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-
+---------------------------------------------------------------------------------------------
 
 # settings.py
 
@@ -25,45 +29,74 @@ MEDIA_ROOT = BASE_DIR / "media"  # assuming BASE_DIR is the root directory of yo
 # ...
 
 
+--------------------------------------------------------------------------------------------------
 
+class OrdersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Orders
+        fields = ('employee','order_number', 'tracking_number', 'borrowers_first_name', 'borrowers_last_name', 'additional_comments','check_received','check_received_amount','status')
+    
+    def create(self, validated_data):
+        order_number = validated_data.get('order_number')
+        validated_data['status'] = 'manifest_pending'
+        validated_data['employee'] = validated_data.get('employee')
+        existing_order = Orders.objects.filter(order_number=order_number).first()
+        if existing_order:
+            raise serializers.ValidationError({"order_number": ["Order with this order_number already exists."]})
+        
+        order = Orders.objects.create(**validated_data)
+        return order
 
-from django.core.files import File
 
 class OrdersPatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Orders
-        fields = ('entered_date', 'closing_date', 'disbursment_date', 'loan_number', 'lender', 'state', 'county', 'zipcode', 'status', 'assigned_to', 'file_adding', 'audit_additional_comment', 'audit_pass')
+        fields = ('entered_date', 'closing_date', 'disbursment_date','loan_number', 'lender', 'state', 'county','zipcode','assigned_to','status','check_list','audit_status','audit_comment')
 
     def update(self, instance, validated_data):
+        # Update the main Orders model fields
         status = validated_data.get('status', instance.status)
+        if status == 'manifest_pending':
+            instance.entered_date = validated_data.get('entered_date', instance.entered_date)
+            instance.closing_date = validated_data.get('closing_date', instance.closing_date)
+            instance.disbursment_date = validated_data.get('disbursment_date', instance.disbursment_date)
+            instance.loan_number = validated_data.get('loan_number', instance.loan_number)
+            instance.lender = validated_data.get('lender', instance.lender)
+            instance.state = validated_data.get('state', instance.state)
+            instance.county = validated_data.get('county', instance.county)
+            instance.zipcode = validated_data.get('zipcode', instance.zipcode)
+            instance.status = 'not_yet_assigned'
 
-        if status == 'manifest pending':
-            # Update fields for 'manifest pending'
-            # ...
+        elif status == 'not_yet_assigned':
+            # Update the assigned_to field
+            assigned_to = validated_data.get('assigned_to')
+            print(assigned_to)
+            if assigned_to:
+                instance.assigned_to = assigned_to
+                instance.status = 'audit_in_progress'
 
-        elif status == 'not yet assigned':
-            # Update 'assigned_to' field
-            # ...
+        elif status == 'audit_in_progress':
+            file_data = validated_data.get('check_list')
 
-        elif status == 'audit in progress':
-            # Update fields for 'audit in progress'
-            # ...
-
-            # Handle file attachment
-            file_data = validated_data.get('file_adding')
             if file_data:
                 # Save the file in the 'media' folder
                 with open(f'media/{file_data.name}', 'wb') as file:
                     for chunk in file_data.chunks():
                         file.write(chunk)
 
-                # Update the 'file_adding' field in the instance
-                instance.file_adding = f'http://127.0.0.1:8000/media/{file_data.name}'
+                # Update the 'check_list' field in the instance
+                instance.check_list = file_data.name
+                instance.audit_status = validated_data.get('audit_status', instance.audit_status)
+                instance.audit_comment = validated_data.get('audit_comment', instance.audit_comment)
+                if instance.audit_status == 'pass':
+                    instance.status = 'audit_pass'
+                else:
+                    instance.status = 'audit_fail'
 
         else:
             raise serializers.ValidationError(f"Invalid status: {status}.")
-
+        
         instance.save()
         return instance
 

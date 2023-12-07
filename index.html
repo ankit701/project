@@ -1,4 +1,32 @@
 <!--
+
+# urls.py
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    # ... your existing urlpatterns ...
+]
+
+# Serve media files during development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+
+# settings.py
+
+# ...
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / "media"  # assuming BASE_DIR is the root directory of your Django project
+
+# ...
+
+
+
+
 from django.core.files import File
 
 class OrdersPatchSerializer(serializers.ModelSerializer):

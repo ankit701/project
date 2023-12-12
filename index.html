@@ -2,6 +2,254 @@
 
 
 
+radar_chart = RadarChart()
+radar_values = Reference(ws, min_col=2, min_row=2, max_col=3, max_row=len(data) + 1)
+radar_chart.add_data(radar_values, titles_from_data=True)
+radar_chart.title = 'Data Radar Chart'
+ws.add_chart(radar_chart, 'E95')
+
+-----++++------
+doughnut_chart = DoughnutChart()
+doughnut_values = Reference(ws, min_col=2, min_row=2, max_col=2, max_row=len(data) + 1)
+doughnut_chart.add_data(doughnut_values, titles_from_data=True)
+doughnut_chart.title = 'Data Doughnut Chart'
+ws.add_chart(doughnut_chart, 'E80')
+
+--------------
+
+area_chart = AreaChart()
+area_values = Reference(ws, min_col=2, min_row=2, max_col=4, max_row=len(data) + 1)
+area_chart.add_data(area_values, titles_from_data=True)
+area_chart.title = 'Data Area Chart'
+ws.add_chart(area_chart, 'E65')
+
+
+
+____&&&______
+scatter_chart = ScatterChart()
+scatter_values = Reference(ws, min_col=2, min_row=2, max_col=3, max_row=len(data) + 1)
+scatter_chart.add_data(scatter_values, titles_from_data=True)
+scatter_chart.x_axis.title = 'X Values'
+scatter_chart.y_axis.title = 'Y Values'
+ws.add_chart(scatter_chart, 'E50')
+--------------
+
+# views.py
+from django.http import HttpResponse
+import openpyxl
+from openpyxl.chart import PieChart, Reference, BarChart, LineChart
+from .models import YourModel
+from datetime import datetime
+import io
+
+def export_data_with_charts(request):
+    # Replace 'YourModel' and 'date_field' with your actual model and date field
+    data = YourModel.objects.filter(date_field__gte=datetime(2023, 1, 1))  # Filter by date
+
+    # Create Excel workbook and add data
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Data Sheet'
+
+    # Add headers
+    headers = ['Field1', 'Field2', 'Date']  # Replace with your actual field names
+    ws.append(headers)
+
+    # Add data rows
+    for row in data:
+        ws.append([row.field1, row.field2, row.date_field])  # Replace with your actual field names
+
+    # Set column widths (optional)
+    for col_num, header in enumerate(headers, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_num)
+        max_length = max(len(str(cell.value)) for cell in ws[col_letter])
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[col_letter].width = adjusted_width
+
+    # Create pie chart using openpyxl
+    pie_chart = PieChart()
+    data_points = Reference(ws, min_col=2, min_row=2, max_col=2, max_row=len(data) + 1)
+    labels = Reference(ws, min_col=1, min_row=2, max_row=len(data) + 1)
+    pie_chart.add_data(data_points, titles_from_data=True)
+    pie_chart.set_categories(labels)
+    pie_chart.title = 'Data Pie Chart'
+    ws.add_chart(pie_chart, 'E5')
+
+    # Create bar chart using openpyxl
+    bar_chart = BarChart()
+    bar_values = Reference(ws, min_col=2, min_row=2, max_col=4, max_row=len(data) + 1)
+    bar_labels = Reference(ws, min_col=1, min_row=2, max_row=len(data) + 1)
+    bar_chart.add_data(bar_values, titles_from_data=True)
+    bar_chart.set_categories(bar_labels)
+    bar_chart.title = 'Data Bar Chart'
+    ws.add_chart(bar_chart, 'E20')
+
+    # Create line chart using openpyxl
+    line_chart = LineChart()
+    line_values = Reference(ws, min_col=2, min_row=2, max_col=4, max_row=len(data) + 1)
+    line_labels = Reference(ws, min_col=1, min_row=2, max_row=len(data) + 1)
+    line_chart.add_data(line_values, titles_from_data=True)
+    line_chart.set_categories(line_labels)
+    line_chart.title = 'Data Line Chart'
+    ws.add_chart(line_chart, 'E35')
+
+    # Save Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=data_export_with_charts.xlsx'
+    wb.save(response)
+
+    return response
+
+---------------------
+
+# views.py
+from django.http import HttpResponse
+import openpyxl
+from openpyxl.chart import BarChart, Reference
+from .models import YourModel
+from datetime import datetime
+import io
+
+def export_data_with_chart(request):
+    # Replace 'YourModel' and 'date_field' with your actual model and date field
+    data = YourModel.objects.filter(date_field__gte=datetime(2023, 1, 1))  # Filter by date
+
+    # Create Excel workbook and add data
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Data Sheet'
+
+    # Add headers
+    headers = ['Field1', 'Field2', 'Date']  # Replace with your actual field names
+    ws.append(headers)
+
+    # Add data rows
+    for row in data:
+        ws.append([row.field1, row.field2, row.date_field])  # Replace with your actual field names
+
+    # Set column widths (optional)
+    for col_num, header in enumerate(headers, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_num)
+        max_length = max(len(str(cell.value)) for cell in ws[col_letter])
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[col_letter].width = adjusted_width
+
+    # Create bar chart using openpyxl
+    chart = BarChart()
+    values = Reference(ws, min_col=2, min_row=2, max_col=4, max_row=len(data) + 1)
+    labels = Reference(ws, min_col=1, min_row=2, max_row=len(data) + 1)
+    chart.add_data(values, titles_from_data=True)
+    chart.set_categories(labels)
+    chart.title = 'Data Chart'
+    chart.x_axis.title = 'Date'
+    chart.y_axis.title = 'Values'
+    ws.add_chart(chart, 'E5')
+
+    # Save Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=data_export_with_chart.xlsx'
+    wb.save(response)
+
+    return response
+
+------------------
+# views.py
+from django.http import HttpResponse
+from django.shortcuts import render
+import openpyxl
+from .models import YourModel  # Import your model
+from datetime import datetime
+
+def export_data(request):
+    # Replace 'YourModel' and 'date_field' with your actual model and date field
+    data = YourModel.objects.filter(date_field__gte=datetime(2023, 1, 1))  # Filter by date
+
+    # Create Excel workbook and add data
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Data Sheet'
+
+    # Add headers
+    headers = ['Field1', 'Field2', 'Date']  # Replace with your actual field names
+    ws.append(headers)
+
+    # Add data rows
+    for row in data:
+        ws.append([row.field1, row.field2, row.date_field])  # Replace with your actual field names
+
+    # Set column widths (optional)
+    for col_num, header in enumerate(headers, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_num)
+        max_length = max(len(str(cell.value)) for cell in ws[col_letter])
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[col_letter].width = adjusted_width
+
+    # Save Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=data_export.xlsx'
+    wb.save(response)
+
+    return response
+
+
+------------+
+# urls.py
+from django.urls import path
+from .views import generate_chart
+
+urlpatterns = [
+    path('generate-chart/', generate_chart, name='generate_chart'),
+]
+
+---------------
+__________# views.py
+from django.http import HttpResponse
+from django.shortcuts import render
+import openpyxl
+from openpyxl.chart import BarChart, Reference
+import matplotlib.pyplot as plt
+import io
+
+def generate_chart(request):
+    # Your data retrieval logic here (replace this with your data)
+    data = [
+        ('Category 1', 10),
+        ('Category 2', 20),
+        ('Category 3', 15),
+    ]
+
+    # Create Excel workbook and add data
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(['Category', 'Value'])
+    for row in data:
+        ws.append(row)
+
+    # Create bar chart using matplotlib
+    plt.bar(range(2, len(data) + 2), [val[1] for val in data], tick_label=[val[0] for val in data])
+    plt.title('Sample Chart')
+    plt.xlabel('Categories')
+    plt.ylabel('Values')
+
+    # Save matplotlib chart to BytesIO buffer
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close()
+
+    # Add chart image to Excel file
+    chart_image = openpyxl.drawing.image.Image(buffer)
+    ws.add_image(chart_image, 'D5')
+
+    # Save Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=chart_example.xlsx'
+    wb.save(response)
+
+    return response
+
+pip install openpyxl matplotlib
+
+_-------+++##£££££&&&&&&&&&&&&--++++++-----
 check_list = models.FileField(upload_to='uploads/', null=True, blank=True)
 -----------------------------------------------------------------------------------------
 # urls.py

@@ -1,5 +1,76 @@
 <!--
 
+
+
+{
+  "status": "not_yet_assigned",
+  "assigned_to": "your_assigned_to_value",
+  "order_numbers": ["order_number_1", "order_number_2", "order_number_3"]
+}
+
+
+
+
+
+# views.py
+
+from rest_framework.generics import UpdateAPIView
+from rest_framework.response import Response
+from rest_framework import status
+
+class OrdersPatchView(UpdateAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersPatchSerializer
+
+    def get_object(self):
+        order_numbers = self.request.data.get('order_numbers', [])
+        # Assuming you need a list of objects for multiple orders
+        return Orders.objects.filter(order_number__in=order_numbers)
+
+    def update(self, request, *args, **kwargs):
+        instances = self.get_object()
+
+        # Check if instances is None (orders not found)
+        if not instances.exists():
+            return Response({"error": "Invalid order_numbers."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        for instance in instances:
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+        return Response({"message": "Orders updated successfully."})
+
+
+
+
+
+# serializers.py
+
+class OrdersPatchSerializer(serializers.ModelSerializer):
+    # ... (existing code)
+
+    def update(self, instance, validated_data):
+        # Update the main Orders model fields
+        status = validated_data.get('status', instance.status)
+        order_numbers = validated_data.get('order_numbers', [])
+
+        if status == 'manifest_pending':
+            # ... (existing code)
+
+        elif status == 'not_yet_assigned':
+            # Update the assigned_to field for multiple orders
+            assigned_to = validated_data.get('assigned_to')
+            if assigned_to:
+                instance.assigned_to = assigned_to
+                instance.status = 'audit_in_progress'
+
+        instance.save()
+        return instance
+
+
+
 # views.py
 from django.http import HttpResponse
 import openpyxl

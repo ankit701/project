@@ -1,6 +1,31 @@
 <!--
+# management/commands/my_command.py
+
+from django.core.management.base import BaseCommand
+from first_app.models import Order  # Import the model from the first app
+from second_app.models import Order2  # Import the model from the second app
+
+class Command(BaseCommand):
+    help = 'Copy specific data from Order model to Order2 model'
+
+    def handle(self, *args, **options):
+        # Retrieve data from the first database
+        orders_from_first_database = Order.objects.filter(your_filtering_conditions_here)
+
+        # Save specific data into the second database
+        for order in orders_from_first_database:
+            order2_instance = Order2(
+                field1=order.field1,
+                field2=order.field2,
+                # Add other fields as needed
+            )
+            order2_instance.save()
+
+        self.stdout.write(self.style.SUCCESS('Data copied successfully'))
 
 
+
+------_-----------------------------
 
 {
   "status": "not_yet_assigned",

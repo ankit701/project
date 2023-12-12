@@ -1,7 +1,63 @@
 <!--
 
+# views.py
+from django.http import HttpResponse
+import openpyxl
+from openpyxl.chart import BarChart, Reference
+from .models import YourModel
+from datetime import datetime
+import io
+import os
 
+def export_data_with_chart(request):
+    # Replace 'YourModel' and 'date_field' with your actual model and date field
+    data = YourModel.objects.filter(date_field__gte=datetime(2023, 1, 1))  # Filter by date
 
+    # Create Excel workbook and add data
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Data Sheet'
+
+    # Add headers
+    headers = ['Field1', 'Field2', 'Date']  # Replace with your actual field names
+    ws.append(headers)
+
+    # Add data rows
+    for row in data:
+        ws.append([row.field1, row.field2, row.date_field])  # Replace with your actual field names
+
+    # Set column widths (optional)
+    for col_num, header in enumerate(headers, 1):
+        col_letter = openpyxl.utils.get_column_letter(col_num)
+        max_length = max(len(str(cell.value)) for cell in ws[col_letter])
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[col_letter].width = adjusted_width
+
+    # Create bar chart using openpyxl
+    chart = BarChart()
+    values = Reference(ws, min_col=2, min_row=2, max_col=4, max_row=len(data) + 1)
+    labels = Reference(ws, min_col=1, min_row=2, max_row=len(data) + 1)
+    chart.add_data(values, titles_from_data=True)
+    chart.set_categories(labels)
+    chart.title = 'Data Chart'
+    chart.x_axis.title = 'Date'
+    chart.y_axis.title = 'Values'
+    ws.add_chart(chart, 'E5')
+
+    # Specify the local path to save the file
+    local_file_path = '/path/to/your/local/directory/data_export_with_chart.xlsx'
+
+    # Save Excel file locally
+    wb.save(local_file_path)
+
+    # Provide the file for download
+    with open(local_file_path, 'rb') as local_file:
+        response = HttpResponse(local_file.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename=data_export_with_chart.xlsx'
+
+    return response
+
+_------------------
 radar_chart = RadarChart()
 radar_values = Reference(ws, min_col=2, min_row=2, max_col=3, max_row=len(data) + 1)
 radar_chart.add_data(radar_values, titles_from_data=True)

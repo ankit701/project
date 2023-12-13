@@ -1,4 +1,43 @@
 <!--
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import UserSerializer
+from django.contrib.auth import get_user_model
+
+class SignupAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'error': 'Both email and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        existing_user = get_user_model().objects.filter(email=email).first()
+
+        if existing_user:
+            return Response({'error': 'User with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = UserSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
+
+
 # management/commands/my_command.py
 
 from django.core.management.base import BaseCommand

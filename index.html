@@ -1,5 +1,17 @@
 <!--
 
+
+
+
+path('oauth2/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+]
+
+
+AUTHENTICATION_CLASSES = [
+    'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
+    # ... (other authentication classes, if needed)
+]
+
 ==============--------------------======================================--------------------------====================----------======
 _________++++++++++++++++++++++++++++++++++++++++++______________________++++++++++++++++++++++++++++++++++++++___________________+++++
 

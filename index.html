@@ -1,7 +1,61 @@
 <!--
 
 
+# myapp/urls.py
 
+from django.urls import path
+from .views import refresh_token, protected_view
+
+urlpatterns = [
+    path('refresh-token/', refresh_token, name='refresh_token'),
+    path('protected-view/', protected_view, name='protected_view'),
+    # Add other URLs as needed
+]
+
+
+######################################
+
+# myapp/views.py
+
+import requests
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from django.http import JsonResponse
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def refresh_token(request):
+    # Assuming the client credentials are already registered in the Django Admin
+    # You should replace 'your_client_id' and 'your_client_secret' with your actual client credentials
+    client_id = 'your_client_id'
+    client_secret = 'your_client_secret'
+    refresh_token = request.data.get('refresh_token')
+
+    data = {
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token,
+        'client_id': client_id,
+        'client_secret': client_secret,
+    }
+
+    # Make a POST request to the OAuth2 token refresh endpoint
+    response = requests.post('http://localhost:8000/oauth2/token/', data=data)
+
+    if response.status_code == 200:
+        # Successfully refreshed, parse the response
+        token_data = response.json()
+        access_token = token_data.get('access_token')
+        refresh_token = token_data.get('refresh_token')
+
+        # Your logic after successful token refresh
+        return JsonResponse({'access_token': access_token, 'refresh_token': refresh_token, 'message': 'Token refresh successful'})
+    else:
+        # Token refresh failed
+        return JsonResponse({'error': 'Token refresh failed'}, status=response.status_code)
+
+
+
+---_--------------------------777777777-------
 
 path('oauth2/', include('oauth2_provider.urls', namespace='oauth2_provider')),
 ]

@@ -1,6 +1,83 @@
 <!--
 
 
+
+# myapp/views.py
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from oauth2_provider.models import Application, AccessToken, RefreshToken
+from django.contrib.auth.models import User
+from django.http import JsonResponse
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def signup(request):
+    # Assuming the client credentials are already registered in the Django Admin
+    # You should replace 'your_client_id' with your actual client ID
+    client_id = 'your_client_id'
+    
+    # Your signup logic here...
+    # For example, create a new user instance and save it to the database
+    user = User.objects.create(username=request.data.get('username'), password=request.data.get('password'))
+
+    # Create an OAuth2 Application (client) for the user
+    application, _ = Application.objects.get_or_create(
+        user=user,
+        authorization_grant_type='password',
+        client_type='confidential',
+        name=f"{user.username}'s Application",
+        client_id=client_id,
+    )
+
+    # Create an access token for the user
+    access_token = AccessToken.objects.create(
+        user=user,
+        application=application,
+        scope='read write',
+    )
+
+    # Create a refresh token for the user
+    refresh_token = RefreshToken.objects.create(
+        user=user,
+        application=application,
+    )
+
+    return JsonResponse({
+        'access_token': access_token.token,
+        'refresh_token': refresh_token.token,
+        'user_id': user.id,
+        'message': 'User signup and token creation successful'
+    })
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def signin(request):
+    # Assuming the client credentials are already registered in the Django Admin
+    # You should replace 'your_client_id' with your actual client ID
+    client_id = 'your_client_id'
+    access_token = request.data.get('access_token')
+
+    # Verify the access token
+    try:
+        existing_token = AccessToken.objects.get(token=access_token, application__client_id=client_id)
+        
+        # If a valid token exists, return user details
+        return JsonResponse({
+            'user_id': existing_token.user.id,
+            'message': 'User authenticated with existing token'
+        })
+    except AccessToken.DoesNotExist:
+        # Token does not exist or is invalid
+        return JsonResponse({'error': 'Invalid access token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+
+
+
+##################№#######)##############
 # myapp/urls.py
 
 from django.urls import path

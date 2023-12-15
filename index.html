@@ -1,6 +1,48 @@
 <!--
 
 
+# serializers.py
+from rest_framework import serializers
+
+class SignupSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, required=False)  # Password is optional in the first step
+
+
+
+
+++++++++++++++++++++++++++++++++++
+# views.py
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import SignupSerializer
+from django.contrib.auth.models import User
+
+class SignupView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = SignupSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
+
+            # Check if the email already exists
+            if User.objects.filter(email=email).exists():
+                return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Proceed with the signup process
+            user = User.objects.create_user(email=email, password=password)
+
+            return Response({'message': 'Signup successful'}, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+---------------------
+
 from oauth2_provider.models import RefreshToken
 
 # Assuming `refresh_token` is the refresh token you want to check

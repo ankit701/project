@@ -1,6 +1,29 @@
 <!--
 
 
+from oauth2_provider.models import RefreshToken
+
+# Assuming `refresh_token` is the refresh token you want to check
+try:
+    # Try to get the corresponding refresh token
+    refresh_token_instance = RefreshToken.objects.get(token=refresh_token)
+    
+    # Check if the refresh token is expired
+    if refresh_token_instance.access_token.expires < timezone.now():
+        # Expired, re-authenticate the user and obtain new tokens
+        # Redirect the user to the authentication page or initiate a new authentication process
+        # Request new access and refresh tokens after successful authentication
+        # ...
+
+    # Use the current refresh token for the refresh operation
+    # ...
+except RefreshToken.DoesNotExist:
+    # The refresh token doesn't exist; handle accordingly
+    # ...
+
+
+
+
 # myapp/views.py
 
 from rest_framework import status

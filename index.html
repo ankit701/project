@@ -1,15 +1,38 @@
 <!--
 
 
+
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
 import pandas as pd
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .models import Order  # Import your Order model
-from .serializers import OrderSerializer  # Import your OrderSerializer
+from .models import Orders, Employee
 
 class BulkUploadView(APIView):
+    def create_order_instance(self, record_data, employee_id):
+        try:
+            employee_instance = Employee.objects.get(employee_id=employee_id)
+        except Employee.DoesNotExist:
+            raise ValueError(f'Employee with ID {employee_id} not found.')
+
+        # Set the employee instance to the 'employee' field
+        record_data['employee'] = employee_instance
+
+        # Manually set 'status' field
+        record_data['status'] = 'manifest_pending'
+
+        # Check for duplicates before saving
+        if Orders.objects.filter(order_number=record_data['order_number']).exists():
+            return None, record_data['order_number']  # Duplicate order
+
+        return Orders.objects.create(**record_data), None
+
     def post(self, request, *args, **kwargs):
         file = request.FILES.get('file')
 
@@ -24,16 +47,12 @@ class BulkUploadView(APIView):
 
             with transaction.atomic():
                 for record_data in df.to_dict(orient='records'):
-                    serialized_data = OrderSerializer(data=record_data)
-                    if serialized_data.is_valid():
-                        # Check for duplicates before saving
-                        order_instance = Order(**record_data)
-                        if Order.objects.filter(order_number=order_instance.order_number).exists():
-                            duplicate_orders.append(order_instance.order_number)
-                        else:
-                            order_instance.save()
-                    else:
-                        return Response({'error': serialized_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+                    employee_id = 'NSPL0904'  # Replace 'ABC123' with the actual employee_id
+
+                    order_instance, duplicate_order_number = self.create_order_instance(record_data, employee_id)
+
+                    if duplicate_order_number:
+                        duplicate_orders.append(duplicate_order_number)
 
             if duplicate_orders:
                 return Response({'warning': f'Duplicate orders found: {", ".join(duplicate_orders)}'},
@@ -50,11 +69,7 @@ class BulkUploadView(APIView):
 
 
 
-
-
-
-
-
+---------------------------------------------------------------------------------------------------------------------------------------------------------
 # serializers.py
 from rest_framework import serializers
 

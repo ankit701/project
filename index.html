@@ -3,6 +3,109 @@
 
 
 
+import json
+from django.shortcuts import render
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from reportlab.pdfgen import canvas
+from PyPDF2 import PdfFileMerger  # Install with: pip install PyPDF2
+
+@csrf_exempt
+def process_selected_orders(request):
+    if request.method == 'POST':
+        selected_order_ids = json.loads(request.POST.get('selectedOrderIds', '[]'))
+
+        if selected_order_ids:
+            pdf_merger = PdfFileMerger()
+
+            # Generate separate PDFs for each selected order and add to the merger
+            for order_id in selected_order_ids:
+                order = YourOrderModel.objects.get(id=order_id)
+                pdf = generate_pdf_for_order(order)
+                pdf_merger.append(pdf)
+
+            # Create a response with the aggregated PDF
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename=aggregated_orders.pdf'
+            pdf_merger.write(response)
+
+            response_data = {'message': 'PDFs generated successfully'}
+            return response
+
+    return render(request, 'orders.html', {'orders': YourOrderModel.objects.all()})
+
+
+def generate_pdf_for_order(order):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename=order_{order.id}.pdf'
+
+    # Create PDF document using ReportLab
+    p = canvas.Canvas(response)
+    p.drawString(100, 800, f'Order ID: {order.id}')
+    p.drawString(100, 780, f'Details: {order.details}')
+    # Add more details as needed
+
+    p.showPage()
+    p.save()
+
+    return response
+
+
+
+
+
+
+import json
+from django.shortcuts import render
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from reportlab.pdfgen import canvas
+from PyPDF2 import PdfFileMerger  # Install with: pip install PyPDF2
+
+@csrf_exempt
+def process_selected_orders(request):
+    if request.method == 'POST':
+        selected_order_ids = json.loads(request.POST.get('selectedOrderIds', '[]'))
+
+        if selected_order_ids:
+            pdf_merger = PdfFileMerger()
+
+            # Generate separate PDFs for each selected order and add to the merger
+            for order_id in selected_order_ids:
+                order = YourOrderModel.objects.get(id=order_id)
+                pdf = generate_pdf_for_order(order)
+                pdf_merger.append(pdf)
+
+            # Create a response with the aggregated PDF
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename=aggregated_orders.pdf'
+            pdf_merger.write(response)
+
+            response_data = {'message': 'PDFs generated successfully'}
+            return response
+
+    return render(request, 'orders.html', {'orders': YourOrderModel.objects.all()})
+
+
+def generate_pdf_for_order(order):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename=order_{order.id}.pdf'
+
+    # Create PDF document using ReportLab
+    p = canvas.Canvas(response)
+    p.drawString(100, 800, f'Order ID: {order.id}')
+    p.drawString(100, 780, f'Details: {order.details}')
+    # Add more details as needed
+
+    p.showPage()
+    p.save()
+
+    return response
+
+
+
+
+
 Certainly! To achieve this functionality in Django Rest Framework, you'll need to create an HTML page with a table displaying orders, checkboxes for each order, and a "Send" button. Here's a simplified example:
 
 Create an HTML page (e.g., orders.html):

@@ -3,6 +3,100 @@
 
 
 
+
+
+
+from reportlab.lib import colors
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+def generate_pdf_for_order(order):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename=order_{order.id}.pdf'
+
+    # Create PDF document using ReportLab
+    p = canvas.Canvas(response)
+
+    # Set color for the header
+    header_color = colors.HexColor("#3498db")  # Example: Blue color
+    p.setFillColor(header_color)
+    p.setFont("Helvetica", 16)
+
+    # Header
+    p.drawString(100, 800, f'Order ID: {order.id}')
+
+    # Reset color for the rest of the content
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica", 12)
+
+    # Content
+    p.drawString(100, 780, f'Details: {order.details}')
+    
+    # Create a simple bar chart using ReportLab
+    data = [(f'Item {i}', i * 10) for i in range(1, 6)]  # Example data, replace with your order data
+    chart = create_bar_chart(data)
+    chart.drawOn(p, 100, 700)  # Adjust the position as needed
+
+    p.showPage()
+    p.save()
+
+    return response
+
+def create_bar_chart(data):
+    d = Drawing(400, 200)
+    bar_chart = VerticalBarChart()
+    bar_chart.x = 50
+    bar_chart.y = 50
+    bar_chart.width = 300
+    bar_chart.height = 125
+    bar_chart.data = [x[1] for x in data]
+    bar_chart.categoryAxis.categoryNames = [x[0] for x in data]
+
+    d.add(bar_chart)
+
+    return d
+
+
+
+
+
+
+
+from reportlab.lib import colors
+
+def generate_pdf_for_order(order):
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename=order_{order.id}.pdf'
+
+    # Create PDF document using ReportLab
+    p = canvas.Canvas(response)
+
+    # Set color for the header
+    header_color = colors.HexColor("#3498db")  # Example: Blue color
+    p.setFillColor(header_color)
+    p.setFont("Helvetica", 16)
+
+    # Header
+    p.drawString(100, 800, f'Order ID: {order.id}')
+
+    # Reset color for the rest of the content
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica", 12)
+
+    # Content
+    p.drawString(100, 780, f'Details: {order.details}')
+    # Add more details as needed
+
+    p.showPage()
+    p.save()
+
+    return response
+
+
+
+
+
+
 import json
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse

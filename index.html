@@ -4,8 +4,268 @@
 
 
 
+path('process_selected_orders/', OrderListView.as_view(), name='process_selected_orders'),
 
 
+========================================================================================================================
+from django.shortcuts import render
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+from PyPDF2 import PdfMerger
+from reportlab.lib.pagesizes import A4
+from io import BytesIO
+
+class OrderListView(generics.GenericAPIView):
+
+    def get(self,request):
+        return render(request, 'orders.html', {'orders': Orders.objects.all()})
+    
+    def post(self,request):
+        if request.method == 'POST':
+            selected_order_ids = request.POST.getlist('selectedOrders')
+            if selected_order_ids:
+                # Generate separate PDFs for each selected order
+                pdf_merger = PdfMerger()
+
+                for order_id in selected_order_ids:
+                    order = Orders.objects.get(id=order_id)
+                    pdf_content = self.generate_pdf_for_order(order)
+                    pdf_merger.append(BytesIO(pdf_content))
+
+
+                merged_pdf_content = BytesIO()
+                pdf_merger.write(merged_pdf_content)
+
+                    # Merge all PDFs into a single PDF
+                response = HttpResponse(merged_pdf_content.getvalue(), content_type='application/pdf')
+                response['Content-Disposition'] = 'inline; filename=merged_orders.pdf'
+
+                return response
+
+        return render(request, 'orders.html', {'orders': Orders.objects.all()})
+
+
+    def generate_pdf_for_order(self,order):
+        buffer = BytesIO()
+
+        # Create PDF document using ReportLab
+        p = canvas.Canvas(buffer, pagesize=A4)
+
+        # Draw the bar chart
+        self.draw_bar_chart(p, order)
+
+
+        p.setFont("Helvetica-Bold", 16)
+        p.setFillColorRGB(0, 0, 1)  #Set fill color to blue (RGB)
+        
+        # Add header
+        header_text = 'Order Details'
+        text_width = p.stringWidth(header_text, "Helvetica-Bold", 16)
+        x_position = (p._pagesize[0] - text_width) / 2  # Center the text horizontally
+        p.drawString(x_position, 800, header_text)
+
+        # Set font for other details
+        p.setFont("Helvetica", 12)
+        p.setFillColorRGB(0, 0, 0)  # Set fill color to black (RGB)
+
+        details_start_y = 760
+        p.drawString(100, details_start_y, f'Order ID: {order.id}')
+        p.drawString(100, details_start_y-20, f'order number: {order.order_number}')
+        p.drawString(100, details_start_y-40, f'tracking number: {order.tracking_number}')
+        p.drawString(100, details_start_y-60, f'borrowers first name: {order.borrowers_first_name}')
+        p.drawString(100, details_start_y-80, f'check received: {order.check_received}')
+        p.drawString(100, details_start_y-100, f'check received amount: {order.check_received_amount}')
+        p.drawString(100, details_start_y-120, f'additional comments: {order.additional_comments}')
+
+        # Add more details as needed
+
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        return buffer.getvalue()
+    
+    def draw_bar_chart(self, pdf_canvas, order):
+        # Draw the bar chart for check_received_amount
+        data = {'Check Received Amount': order.check_received_amount}
+        self.draw_bar_chart_for_data(pdf_canvas, data)
+
+    def draw_bar_chart_for_data(self, pdf_canvas, data):
+        # Set up chart parameters
+        chart_x = 100
+        chart_y = 500
+        bar_width = 30
+        max_value = max(data.values())
+        scale_factor = 100 / max_value  # Adjust this factor based on your data range
+
+        # Draw bars
+        for label, value in data.items():
+            bar_height = value * scale_factor
+            pdf_canvas.setFillColorRGB(0, 0, 1)  # Set fill color to blue (RGB)
+            pdf_canvas.rect(chart_x, chart_y, bar_width, bar_height, fill=1)
+            pdf_canvas.setFillColorRGB(0, 0, 0)  # Set fill color back to black (RGB)
+
+            # Add labels below the bars
+            pdf_canvas.drawString(chart_x - 5, chart_y - 10, str(label))
+            chart_x += 2 * bar_width  # Adjust the horizontal position of the next bar
+
+
+
+
+
+
+============================================================================================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order List</title>
+    <style>
+        /* Style for the modal */
+        #confirmationModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            cursor: move;
+        }
+        #confirmationModal h5 {
+            margin: 0;
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: grab; /* Set cursor to grab when hovering over the modal header */
+            user-select: none; /* Disable text selection for the header */
+        }
+    </style>
+</head>
+<body>
+    <form id="orderForm" action="/process_selected_orders/" method="post" onsubmit="return showConfirmation();" target="_blank">
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Order ID</th>
+                    <th>order_number</th>
+                    <th>tracking_number</th>
+                    <th>borrowers_first_name</th>
+                    <th>check_received</th>
+                    <th>additional_comments</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                    <tr>
+                        
+                        <td><input type="checkbox" name="selectedOrders" value="{{ order.id }}"></td>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.order_number }}</td>
+                        <td>{{ order.tracking_number }}</td>
+                        <td>{{ order.borrowers_first_name }}</td>
+                        <td>{{ order.check_received }}</td>
+                        <td>{{ order.additional_comments }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" value="Send">Send</button>
+    </form>
+
+
+    
+    <!-- Modal for confirmation -->
+    <div id="confirmationModal">
+        <h5>Confirmation</h5>
+        <p>Do you want to continue?</p>
+        <button onclick="proceedWithFormSubmission()">Continue</button>
+        <button onclick="cancelFormSubmission()">Back</button>
+    </div>
+
+
+    <script>
+        let modal = document.getElementById("confirmationModal");
+        let modalHeader = document.querySelector("#confirmationModal h5");
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        modalHeader.addEventListener("mousedown", startDrag);
+        document.addEventListener("mouseup", stopDrag);
+        document.addEventListener("mousemove", dragModal);
+
+        function startDrag(e) {
+            isDragging = true;
+            offsetX = e.clientX - modal.getBoundingClientRect().left;
+            offsetY = e.clientY - modal.getBoundingClientRect().top;
+            modal.style.transition = "none"; // Disable transition during dragging
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            modal.style.transition = ""; // Enable transition after dragging
+        }
+
+        function dragModal(e) {
+            if (!isDragging) return;
+            modal.style.left = e.clientX - offsetX + "px";
+            modal.style.top = e.clientY - offsetY + "px";
+        }
+
+        function showConfirmation() {
+            // Display the custom confirmation modal
+            modal.style.display = "block";
+            return false;  // Prevent form submission
+        }
+
+        function proceedWithFormSubmission() {
+            // Hide the modal and submit the form
+            modal.style.display = "none";
+            document.getElementById("orderForm").submit();
+        }
+
+        function cancelFormSubmission() {
+            // Hide the modal and go back to the orders page
+            modal.style.display = "none";
+            window.location.href = "/orders/";
+        }
+    </script>
+
+
+
+     <script>
+        function showConfirmation() {
+            // Display the custom confirmation modal
+            document.getElementById("confirmationModal").style.display = "block";
+            return false;  // Prevent form submission
+        }
+
+        function proceedWithFormSubmission() {
+            // Hide the modal and submit the form
+            document.getElementById("confirmationModal").style.display = "none";
+            document.getElementById("orderForm").submit();
+        }
+
+        function cancelFormSubmission() {
+            // Hide the modal and go back to the orders page
+            document.getElementById("confirmationModal").style.display = "none";
+            window.location.href = "/process_selected_orders/";
+        }
+    </script>
+ 
+
+
+
+
+
+
+
+
+==================================================================================================================================
 from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.barcharts import VerticalBarChart

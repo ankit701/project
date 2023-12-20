@@ -3,6 +3,31 @@
 
 
 
+import requests
+
+def validate_access_token(client_id, client_secret, access_token):
+    introspection_endpoint = 'http://localhost:8000/oauth2/introspect/'  # Replace with your introspection endpoint
+
+    data = {
+        'token': access_token,
+        'client_id': client_id,
+        'client_secret': client_secret,
+    }
+
+    response = requests.post(introspection_endpoint, data=data)
+
+    if response.status_code == 200:
+        introspection_data = response.json()
+        if introspection_data.get('active', False):
+            # Token is valid
+            return True
+    # Token is not valid
+    return False
+
+
+
+
+
 
 path('process_selected_orders/', OrderListView.as_view(), name='process_selected_orders'),
 

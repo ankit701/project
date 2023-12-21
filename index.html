@@ -2,6 +2,93 @@
 
 
 
+
+
+
+
+
+# sso_project/urls.py
+from django.urls import path
+from .views import initiate_login, SsoLoginView
+
+urlpatterns = [
+    path('initiate_login/<str:target_project>/<str:target_subdomain>/', initiate_login, name='initiate_login'),
+    path('login/', SsoLoginView.as_view(), name='login'),
+]
+
+
+
+
+
+
+
+
+# sso_project/views.py
+from django.shortcuts import redirect
+
+def initiate_login(request, target_project, target_subdomain):
+    # Perform any logic needed to initiate the login process
+    
+    # For demonstration purposes, let's assume a simple check for user authentication
+    if request.user.is_authenticated:
+        # User is already authenticated, redirect to the target project dashboard
+        return redirect(f'http://{target_subdomain}/{target_project}/dashboard/')
+    else:
+        # User is not authenticated, redirect to the login view of the SSO project
+        return redirect(f'http://{target_subdomain}/login/')
+
+
+
+
+
+
+
+
+
+# dashboard_project/views.py
+from django.shortcuts import redirect
+from django.conf import settings
+from project_config import PROJECT_CONFIG
+
+def initiate_login_dashboard(request):
+    project_name = 'dashboard'
+    
+    # Retrieve the project configuration dynamically
+    project_config = PROJECT_CONFIG.get(project_name, {})
+    
+    # Construct the initiation URL
+    initiate_login_url = f"{project_config.get('base_url', '')}{project_config.get('initiate_login_path', '')}"
+
+    return redirect(initiate_login_url)
+
+
+
+
+
+
+
+
+
+# project_config.py
+PROJECT_CONFIG = {
+    'dashboard': {
+        'base_url': 'https://dashboard.mycompany.com/',
+        'initiate_login_path': 'initiate_login/dashboard/',
+    },
+    'holiday': {
+        'base_url': 'https://holiday.mycompany.com/',
+        'initiate_login_path': 'initiate_login/holiday/',
+    },
+}
+
+
+
+
+
+
+
+
+
 # dashboard_project/views.py
 from django.http import HttpResponse
 from django.views import View

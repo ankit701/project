@@ -2,6 +2,31 @@
 
 
 
+# dashboard_project/views.py
+from django.http import HttpResponse
+from django.views import View
+from django.shortcuts import redirect
+
+class DashboardView(View):
+    def get(self, request):
+        # Check if the access token is valid
+        if not request.META.get('OAUTH_TOKEN_VALID'):
+            # Token is not valid, redirect to the Sign-In Project for authentication
+            signin_url = 'http://127.0.0.1:8000/signin/'
+            return redirect(signin_url)
+
+        # Access token is valid, continue processing
+        user_id = request.META.get('OAUTH_USER_ID')
+        scopes = request.META.get('OAUTH_SCOPES')
+
+        # Your additional logic here using user_id, scopes, etc.
+
+        return HttpResponse(f'Welcome to the Dashboard! User ID: {user_id}, Scopes: {scopes}')
+
+
+
+
+
 
 # sso_project/views.py
 from django.contrib.auth import authenticate, login

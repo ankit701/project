@@ -3,6 +3,192 @@
 
 
 
+# sso_project/views.py
+from django.contrib.auth import authenticate, login
+from django.http import JsonResponse, HttpResponseRedirect
+from django.views import View
+from django.urls import reverse
+from oauth2_provider.views import TokenView
+
+class SsoLoginView(View):
+    def post(self, request):
+        # Assuming you have a form or JSON data with username and password
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        # Authenticate the user
+        user = authenticate(request, username=username, password=password)
+
+        if user:
+            # Log in the user
+            login(request, user)
+
+            # Issue an OAuth 2.0 access token
+            token_response = TokenView.as_view()(request)
+
+            # Extract and include the access token in the redirect URL
+            access_token = token_response.data.get('access_token', None)
+
+            if access_token:
+                # Redirect to the dashboard project with the access token as a query parameter
+                dashboard_url = 'http://127.0.0.1:8001/dashboard/'
+                redirect_url = f'{dashboard_url}?access_token={access_token}'
+                return HttpResponseRedirect(redirect_url)
+            else:
+                return JsonResponse({'error': 'Failed to issue access token'}, status=500)
+
+        return JsonResponse({'error': 'Invalid credentials'}, status=401)
+
+
+
+
+
+
+
+
+
+
+import requests
+from django.conf import settings
+
+class AccessTokenValidationMiddleware:
+    # ... (other methods)
+
+    def get_user_id(self, access_token):
+        introspection_endpoint = settings.OAUTH_INTROSPECTION_ENDPOINT
+        client_id = settings.OAUTH_CLIENT_ID
+        client_secret = settings.OAUTH_CLIENT_SECRET
+
+        response = self.introspect_token(introspection_endpoint, access_token, client_id, client_secret)
+
+        if response.status_code == 200 and response.json().get('active', False):
+            # Assuming the user ID is available in the introspection response
+            return response.json().get('user_id')
+
+        return None
+
+    def get_scopes(self, access_token):
+        introspection_endpoint = settings.OAUTH_INTROSPECTION_ENDPOINT
+        client_id = settings.OAUTH_CLIENT_ID
+        client_secret = settings.OAUTH_CLIENT_SECRET
+
+        response = self.introspect_token(introspection_endpoint, access_token, client_id, client_secret)
+
+        if response.status_code == 200 and response.json().get('active', False):
+            # Assuming the scopes are available in the introspection response
+            return response.json().get('scope', '').split()
+
+        return []
+
+    def introspect_token(self, introspection_endpoint, access_token, client_id, client_secret):
+        # Make a request to the token introspection endpoint
+        response = requests.post(
+            introspection_endpoint,
+            data={'token': access_token, 'client_id': client_id, 'client_secret': client_secret},
+        )
+
+        return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# dashboard_project/settings.py
+MIDDLEWARE = [
+    # ...
+    'dashboard_project.middleware.AccessTokenValidationMiddleware',
+    # ...
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+# dashboard_project/middleware.py
+from django.shortcuts import redirect
+import requests
+
+class AccessTokenValidationMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Extract the access token from the request
+        access_token = request.GET.get('access_token')
+
+        # Validate the access token
+        if not self.validate_access_token(access_token):
+            # Token is not valid, redirect to the Sign-In Project for authentication
+            signin_url = 'http://127.0.0.1:8000/signin/'
+            return redirect(signin_url)
+
+        # Set relevant information in request.META
+        request.META['OAUTH_USER_ID'] = self.get_user_id(access_token)
+        request.META['OAUTH_SCOPES'] = self.get_scopes(access_token)
+        request.META['OAUTH_TOKEN_VALID'] = True
+
+        # Continue with the original request
+        response = self.get_response(request)
+        return response
+
+    def validate_access_token(self, access_token):
+        # Replace 'token_validation_endpoint', 'client_id', and 'client_secret' with actual values
+        token_validation_endpoint = 'http://127.0.0.1:8000/o/introspect/'
+        client_id = 'your_client_id'
+        client_secret = 'your_client_secret'
+
+        # Make a request to the token validation endpoint
+        response = requests.post(
+            token_validation_endpoint,
+            data={'token': access_token, 'client_id': client_id, 'client_secret': client_secret},
+        )
+
+        return response.status_code == 200 and response.json().get('active', False)
+
+    def get_user_id(self, access_token):
+        # Implement logic to extract user ID from the token or introspection response
+        # Replace with actual implementation
+        return 'user123'
+
+    def get_scopes(self, access_token):
+        # Implement logic to extract scopes from the token or introspection response
+        # Replace with actual implementation
+        return ['read', 'write']
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import requests
 
 def validate_access_token(client_id, client_secret, access_token):

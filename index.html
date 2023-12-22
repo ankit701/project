@@ -1,6 +1,54 @@
 <!--
 
 
+import openpyxl
+from django.http import HttpResponse
+from django.db.models import Count
+from .models import Orders, Recordables, Checks
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the date and status)
+    date = request.GET.get('date')
+    status = request.GET.get('status')
+
+    # Filter orders based on date and status
+    orders = Orders.objects.filter(order_creating_date=date, status=status)
+
+    # Count recordables and checks for each order
+    orders_data = []
+    for order in orders:
+        recordables_count = Recordables.objects.filter(order=order).count()
+        checks_count = Checks.objects.filter(order=order).count()
+        orders_data.append({'order': order, 'recordables_count': recordables_count, 'checks_count': checks_count})
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Write headers
+    worksheet.append(['Order ID', 'Recordables Count', 'Checks Count'])
+
+    # Write data
+    for data in orders_data:
+        worksheet.append([data['order'].id, data['recordables_count'], data['checks_count']])
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{date}_{status}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
 # views.py
 from django.http import HttpResponse
 from django.views import View

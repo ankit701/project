@@ -1,6 +1,28 @@
 <!--
 
 
+# views.py
+from django.http import HttpResponse
+from django.views import View
+
+class AuthenticatedView1(View):
+    def get(self, request):
+        if request.META.get('OAUTH_TOKEN_VALID'):
+            return HttpResponse('Welcome to Authenticated View 1!')
+        else:
+            return HttpResponse('Access Denied. Token not valid.')
+
+class AuthenticatedView2(View):
+    def get(self, request):
+        if request.META.get('OAUTH_TOKEN_VALID'):
+            return HttpResponse('Welcome to Authenticated View 2!')
+        else:
+            return HttpResponse('Access Denied. Token not valid.')
+
+
+
+
+
 
 
 

@@ -5,6 +5,77 @@
 
 
 
+# middleware.py
+
+from django.shortcuts import redirect
+import requests
+
+class AccessTokenValidationMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Extract the access token from the request
+        access_token = request.GET.get('access_token')
+
+        # Validate the access token
+        if not self.validate_access_token(access_token):
+            # Token is not valid, redirect to the Sign-In Project for authentication
+            signin_url = 'http://127.0.0.1:8000/signin/'
+            return redirect(signin_url)
+
+        # Set relevant information in request.META
+        request.META['OAUTH_USER_ID'] = self.get_user_id(access_token)
+        request.META['OAUTH_SCOPES'] = self.get_scopes(access_token)
+        request.META['OAUTH_TOKEN_VALID'] = True
+
+        # Continue with the original request
+        response = self.get_response(request)
+
+        # Check if the user is logging out
+        if 'logout' in request.GET:
+            # Reset relevant information
+            request.META['OAUTH_USER_ID'] = None
+            request.META['OAUTH_SCOPES'] = None
+            request.META['OAUTH_TOKEN_VALID'] = False
+
+            # Redirect to the SSO login page after logout
+            signin_url = 'http://127.0.0.1:8000/signin/'
+            return redirect(signin_url)
+
+        return response
+
+    def validate_access_token(self, access_token):
+        # Replace 'token_validation_endpoint', 'client_id', and 'client_secret' with actual values
+        token_validation_endpoint = 'http://127.0.0.1:8000/o/introspect/'
+        client_id = 'your_client_id'
+        client_secret = 'your_client_secret'
+
+        # Make a request to the token validation endpoint
+        response = requests.post(
+            token_validation_endpoint,
+            data={'token': access_token, 'client_id': client_id, 'client_secret': client_secret},
+        )
+
+        return response.status_code == 200 and response.json().get('active', False)
+
+    def get_user_id(self, access_token):
+        # Implement logic to extract user ID from the token or introspection response
+        # Replace with actual implementation
+        return 'user123'
+
+    def get_scopes(self, access_token):
+        # Implement logic to extract scopes from the token or introspection response
+        # Replace with actual implementation
+        return ['read', 'write']
+
+
+
+
+
+
+
+
 
 
 from django.urls import path

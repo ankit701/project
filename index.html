@@ -1,6 +1,75 @@
 <!--
 
 
+import openpyxl
+from openpyxl.styles import PatternFill
+from django.http import HttpResponse
+from django.db.models import Count
+from .models import Orders, AnotherTable
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Write headers with colors
+    header_row = ['Date', 'Total Orders']
+    for status in distinct_statuses:
+        header_row.append(status)
+    header_row.append('Another Table Count')
+
+    # Apply colors to the header row
+    fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+    for col_num in range(1, len(header_row) + 1):
+        cell = worksheet.cell(row=1, column=col_num)
+        cell.value = header_row[col_num - 1]
+        cell.fill = fill
+
+    worksheet.append([])  # Add an empty row for better visual separation
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('order_creating_date', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d')]
+
+        # Count total orders for the date
+        total_orders = Orders.objects.filter(order_creating_date=date).count()
+        data_row.append(total_orders)
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(order_creating_date=date, status=status).count()
+            data_row.append(count)
+
+        # Optionally, add counts from another table related to Order model
+        another_table_count = AnotherTable.objects.filter(order__order_creating_date=date).count()
+        data_row.append(another_table_count)
+
+        worksheet.append(data_row)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
 
 import openpyxl
 from django.http import HttpResponse

@@ -2,6 +2,51 @@
 
 
 
+import openpyxl
+from django.http import HttpResponse
+from django.db.models import Count
+from .models import Orders
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Write headers
+    header_row = ['Date']
+    header_row.extend(distinct_statuses)
+    worksheet.append(header_row)
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('order_creating_date', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d')]
+        for status in distinct_statuses:
+            count = Orders.objects.filter(order_creating_date=date, status=status).count()
+            data_row.append(count)
+        worksheet.append(data_row)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
 import os
 import openpyxl
 from django.http import HttpResponse

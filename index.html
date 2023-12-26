@@ -1,6 +1,109 @@
 <!--
 
 
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font
+from django.http import HttpResponse
+from django.db.models import Count
+from .models import Orders, AnotherTable
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Set column width for better readability
+    worksheet.column_dimensions['A'].width = 15  # Date
+    worksheet.column_dimensions['B'].width = 15  # Total Orders
+    for col_num in range(3, len(distinct_statuses) + 3):
+        worksheet.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15  # Status columns
+
+    # Apply header styling
+    header_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Dark blue
+    header_font = Font(color="FFFFFF", bold=True)
+    date_total_fill = PatternFill(start_color="800000", end_color="800000", fill_type="solid")  # Maroon
+    date_total_font = Font(color="FFFFFF", bold=True)
+    status_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")  # Red
+    status_font = Font(color="FFFFFF", bold=True)
+
+    # Write headers with colors
+    header_row = ['Heading', 'Date', 'Total Orders']
+    header_row.extend(distinct_statuses)
+    for col_num in range(1, len(header_row) + 1):
+        cell = worksheet.cell(row=1, column=col_num)
+        cell.value = header_row[col_num - 1]
+        cell.fill = header_fill
+        cell.font = header_font
+
+    # Write sub-headers with colors
+    subheader_row = ['Subheading', '', 'Postclosing']
+    subheader_row.extend([''] * len(distinct_statuses))
+    for col_num in range(1, len(subheader_row) + 1):
+        cell = worksheet.cell(row=2, column=col_num)
+        cell.value = subheader_row[col_num - 1]
+        if 'Postclosing' in cell.value:
+            cell.fill = date_total_fill
+            cell.font = date_total_font
+        else:
+            cell.fill = status_fill
+            cell.font = status_font
+
+    worksheet.append([])  # Add an empty row for better visual separation
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(order_creating_date__range=(start_date, end_date)).values_list('order_creating_date', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d')]
+
+        # Count total orders for the date
+        total_orders = Orders.objects.filter(order_creating_date=date).count()
+        data_row.append(total_orders)
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(order_creating_date=date, status=status).count()
+            data_row.append(count)
+
+        # Count occurrences in AnotherTable based on the order's creation date
+        another_table_count = AnotherTable.objects.filter(order__order_creating_date=date).count()
+        data_row.append(another_table_count)
+
+        worksheet.append(data_row)
+
+    # Add a row at the end for totals
+    total_row = ['Total']
+    total_row.append(Orders.objects.filter(order_creating_date__range=(start_date, end_date)).count())
+    for status in distinct_statuses:
+        total_row.append(Orders.objects.filter(order_creating_date__range=(start_date, end_date), status=status).count())
+    total_row.append(AnotherTable.objects.filter(order__order_creating_date__range=(start_date, end_date)).count())
+    worksheet.append(total_row)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
 import openpyxl
 from openpyxl.styles import PatternFill
 from django.http import HttpResponse

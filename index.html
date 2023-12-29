@@ -1,6 +1,71 @@
 <!--
 
 
+import requests
+
+class YourDashboardView(View):
+    def get(self, request):
+        # Assuming you have received the authorization code from the OAuth 2.0 authorization process
+        authorization_code = request.GET.get('code')
+
+        # Replace 'your_sso_base_url' with the actual base URL of your SSO project
+        sso_base_url = 'http://127.0.0.1:8000/'
+
+        # Construct the URL for the ValidateCodeView in the SSO project
+        validate_code_url = f'{sso_base_url}validate-code/'
+
+        # Make a request to the ValidateCodeView with the authorization code
+        response = requests.post(validate_code_url, data={'code': authorization_code})
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Parse the response JSON to get the access token
+            access_token = response.json().get('access_token')
+            
+            # Now you have the access token and can use it as needed
+            # ...
+
+            return HttpResponse(f'Access Token: {access_token}')
+        else:
+            # Handle the case where the request to validate the code failed
+            return HttpResponse('Failed to obtain access token')
+
+
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.authentication import OAuth2Authentication
+from rest_framework.permissions import IsAuthenticated
+
+class ValidateCodeView(APIView):
+    authentication_classes = [OAuth2Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # Check if the user is authenticated
+        if request.auth:
+            # User is authenticated, proceed with validation logic
+            # ...
+
+            # Return the access token
+            return Response({'access_token': request.auth.token})
+
+        # Handle unauthenticated request (no valid access token)
+        return Response({'error': 'Invalid or missing access token'}, status=401)
+
+
+
+
+
+
+
+
 
 
 import requests

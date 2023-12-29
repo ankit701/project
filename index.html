@@ -2,6 +2,119 @@
 
 
 
+
+import requests
+
+# Assuming you have the SSO project's OAuth 2.0 client credentials
+client_id = 'your_sso_client_id'
+client_secret = 'your_sso_client_secret'
+
+# Assuming you have the random key obtained during the SSO login process
+random_key = 'random_key_obtained_during_login'
+
+# Construct the URL for the SSO's ValidateCodeView
+validate_code_url = 'http://127.0.0.1:8000/validate-code/'
+
+# Make a request to the ValidateCodeView with OAuth 2.0 credentials and the random key
+response = requests.post(
+    validate_code_url,
+    data={'random_key': random_key},
+    auth=(client_id, client_secret)
+)
+
+# Parse the response
+if response.status_code == 200:
+    access_token = response.json().get('access_token')
+    print(f'Success! Access Token: {access_token}')
+else:
+    error_message = response.json().get('error', 'Unknown error')
+    print(f'Error: {error_message}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+# sso_project/views.py
+import json
+import random
+from django.contrib.auth import authenticate
+from django.http import JsonResponse, HttpResponseRedirect
+from django.views import View
+from django.urls import reverse
+
+class SsoLoginView(View):
+    def post(self, request):
+        # Assuming you have a form or JSON data with username and password
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        # Authenticate the user
+        user = authenticate(request, username=username, password=password)
+
+        if user:
+            # Generate a random key for redirection
+            random_key = str(random.randint(100000, 999999))
+
+            # Store the random key in a secure way (e.g., database)
+            store_random_key(random_key, user)
+
+            # Redirect to the dashboard with the random key
+            redirect_url = reverse('dashboard')  # Replace 'dashboard' with your actual URL name
+            redirect_url += f'?random_key={random_key}'
+            return HttpResponseRedirect(redirect_url)
+        else:
+            return JsonResponse({'error': 'Invalid credentials'}, status=401)
+
+class ValidateCodeView(View):
+    def post(self, request):
+        random_key = request.POST.get('random_key')
+
+        # Validate the random key against your secure storage
+        user = validate_random_key(random_key)
+
+        if user:
+            # Generate and return an access token
+            access_token = generate_access_token(user)
+            return JsonResponse({'access_token': access_token})
+        else:
+            return JsonResponse({'error': 'Invalid random key'}, status=401)
+
+def store_random_key(random_key, user):
+    # Implement your logic to securely store the random key (e.g., in a database)
+    pass
+
+def validate_random_key(random_key):
+    # Implement your logic to securely validate the random key and retrieve the associated user
+    # Replace this with your actual implementation
+    return None  # Return the user if the random key is valid, otherwise return None
+
+def generate_access_token(user):
+    # Implement your logic to securely generate an access token based on the user
+    # Replace this with your actual implementation
+    return 'generated_access_token'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from django.http import HttpResponse

@@ -1,5 +1,74 @@
 <!--
 
+# Middleware in dummy1, dummy2, dummy3 projects
+class PermissionCheckMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Extract permissions from the access token payload
+        access_token = request.GET.get('access_token')
+        user_permissions = self.extract_permissions(access_token)
+
+        # Check if the user has the necessary permission for the current view
+        if 'can_access_dummy2' in user_permissions:
+            # Continue with the original request
+            response = self.get_response(request)
+            return response
+        else:
+            # Redirect or handle access denied
+            return HttpResponse("Access denied: Insufficient permissions")
+
+    def extract_permissions(self, access_token):
+        # Implement logic to extract permissions from the access token payload
+        # Replace with actual implementation
+        return ['can_access_dummy1', 'can_access_dummy2', 'can_access_dummy3']
+
+
+
+
+
+
+
+
+
+
+from oauth2_provider.models import AccessToken
+from django.contrib.auth.models import User
+
+user = User.objects.get(email='user1@example.com')
+access_token = AccessToken.objects.create(user=user, scope=' '.join(user.get_all_permissions()))
+
+
+
+
+
+
+
+
+
+
+
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+
+User = get_user_model()
+
+# Create a user
+user = User.objects.create(email='user1@example.com', password='securepassword')
+
+# Assign a permission (e.g., can_access_dummy2) to the user
+content_type = ContentType.objects.get_for_model(User)
+permission = Permission.objects.get(content_type=content_type, codename='can_access_dummy2')
+user.user_permissions.add(permission)
+
+
+
+
+
+
 
 import requests
 

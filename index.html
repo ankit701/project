@@ -1,5 +1,78 @@
 <!--
 
+
+
+import requests
+
+def access_example_api(access_token):
+    example_api_url = 'http://127.0.0.1:8002/example-api/'  # Replace with the correct URL of your Example API endpoint
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+
+    try:
+        response = requests.get(example_api_url, headers=headers)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return {'error': f'Request failed: {str(e)}'}
+
+# Example usage:
+# Assuming access_token is a valid OAuth 2.0 access token
+result = access_example_api(access_token)
+print(result)
+
+
+
+
+
+
+# example_project/views.py
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import OAuth2Authentication
+from rest_framework.decorators import authentication_classes, permission_classes
+
+@authentication_classes([OAuth2Authentication])
+@permission_classes([IsAuthenticated])
+def example_api(request):
+    if request.method == 'GET':
+        return JsonResponse({"message": "Hello from Example project!"})
+    else:
+        return JsonResponse({"error": "Invalid request method"}, status=400)
+
+
+
+
+
+
+
+# sso_project/views.py
+import requests
+from django.http import HttpResponse
+
+def access_example_api(request):
+    # Assuming you have the access token, client ID, and client secret
+    access_token = 'your_access_token'
+    client_id = 'your_client_id'
+    client_secret = 'your_client_secret'
+
+    example_url = 'http://127.0.0.1:8001/example-api/'
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+
+    # Assuming a GET request
+    response = requests.get(example_url, headers=headers)
+
+    # Process the response as needed
+    return HttpResponse(response.text)
+
+
+
 # Middleware in dummy1, dummy2, dummy3 projects
 class PermissionCheckMiddleware:
     def __init__(self, get_response):

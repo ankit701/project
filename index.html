@@ -2,6 +2,35 @@
 
 
 
+
+# middleware.py in the dummy1 project
+class AccessTokenValidationMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Extract the access token and random key from the request
+        access_token_param = request.GET.get('accesstoken', '')
+        
+        # Split the access token and random key
+        access_token, random_generated_key = access_token_param.split('-')
+
+        # Continue with your existing logic
+        # ...
+
+        # Set relevant information in request.META or handle accordingly
+        # ...
+
+        # Continue with the original request
+        response = self.get_response(request)
+        return response
+
+
+
+
+
+
+
 from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
 

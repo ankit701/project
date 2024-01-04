@@ -1,6 +1,57 @@
 <!--
 
 
+from django.http import HttpResponse
+from django.views import View
+from .decorators import oauth_token_required
+
+class DashboardView(View):
+    @oauth_token_required
+    def get(self, request):
+        return HttpResponse('Welcome to the Dashboard!')
+
+
+
+
+
+
+
+from django.views import View
+from django.shortcuts import render
+from yourapp.decorators import oauth_token_required
+
+class DashboardView(View):
+    @oauth_token_required
+    def get(self, request):
+        # Your view logic here
+        return render(request, 'dashboard.html')
+
+
+
+
+
+
+
+from django.http import HttpResponseRedirect
+from functools import wraps
+
+def oauth_token_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.META.get('OAUTH_TOKEN_VALID'):
+            # Redirect to the Sign-In Project for authentication
+            signin_url = 'http://127.0.0.1:8000/signin/'
+            return HttpResponseRedirect(signin_url)
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
+
+
+
+
+
 
 import requests
 

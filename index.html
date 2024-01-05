@@ -3,6 +3,18 @@
 
 
 
+from django.utils.deprecation import MiddlewareMixin
+from oauth2_provider.models import AccessToken
+
+class AccessTokenMiddleware(MiddlewareMixin):
+    def process_request(self, request):
+        if request.user.is_authenticated:
+            # Get the latest access token for the authenticated user
+            access_token_entry = AccessToken.objects.filter(user=request.user).first()
+
+            if access_token_entry:
+                # Add Authorization header with the access token
+                request.headers['Authorization'] = f'Bearer {access_token_entry.token}'
 
 
 

@@ -3,6 +3,103 @@
 
 
 
+
+
+
+
+
+from functools import wraps
+from rest_framework.response import Response
+from rest_framework.authentication import OAuth2Authentication
+from rest_framework.permissions import IsAuthenticated
+
+def authenticate_and_authorize(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return Response({'message': 'User is not authenticated'}, status=401)
+
+        # Check if the user has a valid OAuth2 access token
+        authentication_classes = getattr(view_func, 'authentication_classes', [])
+        if OAuth2Authentication in authentication_classes:
+            if not request.auth or not request.auth.token:
+                return Response({'message': 'Invalid or missing access token'}, status=401)
+
+        # Check if the user has the required permissions
+        permission_classes = getattr(view_func, 'permission_classes', [])
+        if IsAuthenticated in permission_classes:
+            if not request.user.is_authenticated:
+                return Response({'message': 'User does not have permission to access this resource'}, status=403)
+
+        # Call the original view function
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
+
+
+
+
+
+
+from django.utils.decorators import method_decorator
+from your_app.decorators import authenticate_and_authorize
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.authentication import OAuth2Authentication
+from rest_framework.permissions import IsAuthenticated
+
+@method_decorator(authenticate_and_authorize, name='dispatch')
+class MyApiView(APIView):
+    authentication_classes = [OAuth2Authentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({'message': 'This is a protected API endpoint'})
+
+
+
+
+
+
+
+from functools import wraps
+from rest_framework.response import Response
+from rest_framework.authentication import OAuth2Authentication
+from rest_framework.permissions import IsAuthenticated
+
+def authenticate_and_authorize(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return Response({'message': 'User is not authenticated'}, status=401)
+
+        # Check if the user has a valid OAuth2 access token
+        authentication_classes = getattr(view_func, 'authentication_classes', [])
+        if OAuth2Authentication in authentication_classes:
+            if not request.auth or not request.auth.token:
+                return Response({'message': 'Invalid or missing access token'}, status=401)
+
+        # Check if the user has the required permissions
+        permission_classes = getattr(view_func, 'permission_classes', [])
+        if IsAuthenticated in permission_classes:
+            if not request.user.is_authenticated:
+                return Response({'message': 'User does not have permission to access this resource'}, status=403)
+
+        # Call the original view function
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
+
+
+
+
+
 # middleware.py in the dummy1 project
 class AccessTokenValidationMiddleware:
     def __init__(self, get_response):

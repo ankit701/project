@@ -3,6 +3,56 @@
 
 
 
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+</head>
+<body>
+    <button id="logoutButton">Logout</button>
+
+    <script>
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            // Replace 'YOUR_ACCESS_TOKEN' with the actual access token
+            var accessToken = 'YOUR_ACCESS_TOKEN';
+            var xhr = new XMLHttpRequest();
+            var url = 'http://127.0.0.1:8000/logout/';
+
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    // Handle the response or redirect as needed
+                    if (xhr.status === 200) {
+                        // Redirect to the SSO/signin page after successful logout
+                        window.location.href = 'http://127.0.0.1:8000/signin/sso/';
+                    } else {
+                        // Handle errors or other status codes
+                        console.error(xhr.statusText);
+                    }
+                }
+            };
+
+            xhr.send();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
 from django.utils.deprecation import MiddlewareMixin
 from oauth2_provider.models import AccessToken
 

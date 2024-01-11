@@ -1,6 +1,154 @@
 <!--
 
 
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    # Extract year from start_date and end_date
+    start_year = datetime.strptime(start_date, '%Y-%m-%d').year
+    end_year = datetime.strptime(end_date, '%Y-%m-%d').year
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(created_at__year__range=(start_year, end_year)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+
+    # ... (rest of the code remains unchanged)
+
+    # Write header2 with color
+    header2_row = ['Year', 'Total'] + list(distinct_statuses)
+    for col_num in range(1, len(header2_row) + 1):
+        cell = worksheet.cell(row=2, column=col_num)
+        cell.value = header2_row[col_num - 1]
+        if 'Total' in cell.value:
+            cell.fill = header2_postclosing_fill
+            cell.font = header2_font  # Set font to bold for 'Total'
+            cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+
+    # Dynamically merge cells for 'Year'
+    worksheet.merge_cells(start_row=2, start_column=1, end_row=3, end_column=1)  # Merge cells for 'Year'
+
+    # Write header3 with color
+    header3_row = [''] * 2 + list(distinct_statuses)
+    for col_num in range(3, len(header3_row) + 1):
+        cell = worksheet.cell(row=3, column=col_num)
+        cell.value = header3_row[col_num - 1]
+        cell.fill = header3_fill
+        cell.font = header3_font
+        cell.border = border
+
+    # Generate data for each year and status
+    year_range = Orders.objects.filter(created_at__year__range=(start_year, end_year)).values_list('created_at__year', flat=True).distinct()
+
+    for year in year_range:
+        data_row = [str(year)]  # Convert year to string for consistency
+
+        # Count total orders for the year
+        total_orders = Orders.objects.filter(created_at__year=year).count()
+        data_row.append(total_orders)
+
+        # Count orders for each status in that year
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at__year=year, status=status).count()
+            data_row.append(count)
+            # Write data cells with borders
+            for col_num in range(1, len(data_row) + 1):
+                cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+                cell.border = border
+                cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+        worksheet.append(data_row)
+
+    # ... (rest of the code remains unchanged)
+
+    file_path = 'F:/work/order_report_{start_year}_to_{end_year}.xlsx'  # Update this path
+
+    # ... (rest of the code remains unchanged)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    # Extract year from start_date and end_date
+    start_year = datetime.strptime(start_date, '%Y-%m-%d').year
+    end_year = datetime.strptime(end_date, '%Y-%m-%d').year
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(created_at__year__range=(start_year, end_year)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+
+    # ... (rest of the code remains unchanged)
+
+    # Generate data for each year and status
+    year_range = Orders.objects.filter(created_at__year__range=(start_year, end_year)).values_list('created_at__year', flat=True).distinct()
+
+    for year in year_range:
+        data_row = [str(year)]  # Convert year to string for consistency
+
+        # Count total orders for the year
+        total_orders = Orders.objects.filter(created_at__year=year).count()
+        data_row.append(total_orders)
+
+        # Count orders for each status in that year
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at__year=year, status=status).count()
+            data_row.append(count)
+            # Write data cells with borders
+            for col_num in range(1, len(data_row) + 1):
+                cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+                cell.border = border
+                cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+        worksheet.append(data_row)
+
+    # ... (rest of the code remains unchanged)
+
+    file_path = 'F:/work/order_report_{start_year}_to_{end_year}.xlsx'  # Update this path
+
+    # ... (rest of the code remains unchanged)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
 
 
 

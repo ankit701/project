@@ -5,6 +5,83 @@ import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from django.http import HttpResponse
 from django.db.models import Count
+
+def generate_report(request):
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    distinct_statuses = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    workbook = openpyxl.Workbook()
+    password = "your_password_here"
+    workbook.security.set_workbook_password(password)
+
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Set column width, apply styling, and merge cells for headers
+
+    # ... (previous code for header styling)
+
+    # Dynamically merge cells for 'Date' and 'Order'
+    worksheet.merge_cells(start_row=2, start_column=1, end_row=3, end_column=1)  # Merge cells for 'Date'
+    worksheet.merge_cells(start_row=2, start_column=2, end_row=3, end_column=2)  # Merge cells for 'Order'
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d')]
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at=date, status=status).count()
+            data_row.append(count)
+
+        worksheet.append(data_row)
+
+    # Add a row at the end for totals and set the row to black color
+    total_row = ['Total']
+    for status in distinct_statuses:
+        total_row.append(Orders.objects.filter(created_at__range=(start_date, end_date), status=status).count())
+
+    worksheet.append(total_row)
+    for cell in worksheet.iter_rows(min_row=worksheet.max_row, max_row=worksheet.max_row, min_col=1, max_col=len(total_row)):
+        for c in cell:
+            c.fill = header1_fill
+            c.font = header1_font
+            c.border = border
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=worksheet.max_row + 1, max_row=worksheet.max_row + 100, min_col=1, max_col=len(total_row)):
+        for cell in row:
+            cell.fill = unused_fill
+
+    file_path = 'F:/work/order_report_{start_date}_to_{end_date}.xlsx'
+
+    workbook.save(file_path)
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
 from datetime import datetime
 
 def generate_report(request):

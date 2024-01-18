@@ -4,6 +4,87 @@
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from django.http import HttpResponse
+
+def generate_user_document_report(request):
+    # Fetch data from the database
+    users = User.objects.all()
+    documents = Document.objects.filter(user_id__in=users)
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+
+    worksheet = workbook.active
+    worksheet.title = 'User Document Report'
+
+    # Set column width for better readability
+    for col_num in range(1, 7):
+        worksheet.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15
+
+    # Apply header styling
+    header_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Navy Blue
+    header_font = Font(color="FFFFFF", bold=True)
+    header_border = Border(left=Side(border_style='thin', color='000000'),
+                           right=Side(border_style='thin', color='000000'),
+                           top=Side(border_style='thin', color='000000'),
+                           bottom=Side(border_style='thin', color='000000'))
+
+    # Write headers with styling
+    headers = ['Id', 'Name', 'Email', 'Phone', 'Docs', 'No_of_docs']
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=1, column=col_num, value=header_text)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = header_border
+        cell.alignment = Alignment(horizontal="center")
+
+    # Process data and populate the worksheet
+    for user_num, user in enumerate(users, start=1):
+        user_documents = documents.filter(user_id=user.id)
+        docs_list = "/".join(doc.document_name for doc in user_documents)
+        no_of_docs = len(user_documents)
+
+        data_row = [user.id, user.name, user.email, user.phone, docs_list, no_of_docs]
+
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=user_num + 1, column=col_num, value=value)
+            cell.border = header_border
+
+            # Apply light blue background to alternate rows in data
+            if user_num % 2 == 0:
+                cell_fill = PatternFill(start_color="87CEFA", end_color="87CEFA", fill_type="solid")  # Light Blue
+                cell.fill = cell_fill
+
+    # Save the workbook
+    file_path = 'F:/work/user_document_report.xlsx'  # Update this path
+    workbook.save(file_path)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=user_document_report.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
 from django.db.models import Count
 
 def generate_report(request):

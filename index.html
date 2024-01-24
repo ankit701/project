@@ -1,6 +1,744 @@
 <!--
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+
+def generate_user_document_report(request):
+    # Fetch data from the database
+    users = User.objects.all()
+    documents = Document.objects.filter(user_id__in=users)
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+
+    worksheet = workbook.active
+    worksheet.title = 'User Document Report'
+
+    # Set column width for better readability
+    for col_num in range(1, 7):
+        worksheet.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15
+
+    # Apply header styling
+    header_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Navy Blue
+    header_font = Font(color="FFFFFF", bold=True)
+    header_border = Border(left=Side(border_style='thin', color='000000'),
+                           right=Side(border_style='thin', color='000000'),
+                           top=Side(border_style='thin', color='000000'),
+                           bottom=Side(border_style='thin', color='000000'))
+
+    # Write headers with styling
+    headers = ['Id', 'Name', 'Email', 'Phone', 'Docs', 'No_of_docs']
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=1, column=col_num, value=header_text)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = header_border
+        cell.alignment = Alignment(horizontal="center")
+
+    # Process data and populate the worksheet
+    for user_num, user in enumerate(users, start=1):
+        user_documents = documents.filter(user_id=user.id)
+        docs_list = "/".join(doc.document_name for doc in user_documents)
+        no_of_docs = len(user_documents)
+
+        data_row = [user.id, user.name, user.email, user.phone, docs_list, no_of_docs]
+
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=user_num + 1, column=col_num, value=value)
+            cell.border = header_border
+
+            # Apply light blue background to alternate rows in data
+            if user_num % 2 == 0:
+                cell_fill = PatternFill(start_color="87CEFA", end_color="87CEFA", fill_type="solid")  # Light Blue
+                cell.fill = cell_fill
+            else:
+                cell_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+                cell.fill = cell_fill
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row, min_col=1, max_col=len(headers)):
+        for cell in row:
+            if cell.value is None:
+                cell_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+                cell.fill = cell_fill
+
+    # Save the workbook
+    file_path = 'F:/work/user_document_report.xlsx'  # Update this path
+    workbook.save(file_path)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=user_document_report.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+# Constants for color codes
+BLACK_COLOR = "000000"
+NAVY_BLUE_COLOR = "000080"
+LIGHT_BLUE_COLOR = "87CEFA"
+WHITE_COLOR = "FFFFFF"
+PURPLE_COLOR = "800080"
+
+def set_column_width(worksheet, column, width):
+    worksheet.column_dimensions[column].width = width
+
+def apply_header_style(cell, fill_color, font_color=WHITE_COLOR, is_bold=True):
+    cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+    cell.font = Font(color=font_color, bold=is_bold)
+
+def write_header(worksheet, start_row, headers, fill_color, font_color=WHITE_COLOR, is_bold=True, border=True):
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=start_row, column=col_num, value=header_text)
+        apply_header_style(cell, fill_color, font_color, is_bold)
+        if border:
+            cell.border = Border(left=Side(border_style='thin', color=BLACK_COLOR),
+                                 right=Side(border_style='thin', color=BLACK_COLOR),
+                                 top=Side(border_style='thin', color=BLACK_COLOR),
+                                 bottom=Side(border_style='thin', color=BLACK_COLOR))
+
+def merge_and_apply_style(worksheet, start_row, start_col, end_row, end_col, fill_color, font_color=WHITE_COLOR, is_bold=True):
+    cell = worksheet.cell(row=start_row, column=start_col, value='')
+    worksheet.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+    apply_header_style(cell, fill_color, font_color, is_bold)
+
+def get_status_counts(date, statuses):
+    return [Orders.objects.filter(created_at=date, status=status).count() for status in statuses]
+
+def generate_report(request):
+    # ... (existing code)
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d'), date.strftime('%A'), Orders.objects.filter(created_at=date).count()]
+
+        # Count orders for each status on that date
+        status_counts = get_status_counts(date, distinct_statuses)
+        data_row.extend(status_counts)
+
+        # Write data cells with borders
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+            cell.border = border
+            cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=len(header2_row)):
+        for cell in row:
+            if cell.value is None:
+                cell.fill = PatternFill(start_color=WHITE_COLOR, end_color=WHITE_COLOR, fill_type="solid")
+
+    # ... (remaining code)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+# Constants for color codes
+BLACK_COLOR = "000000"
+NAVY_BLUE_COLOR = "000080"
+LIGHT_BLUE_COLOR = "87CEFA"
+WHITE_COLOR = "FFFFFF"
+PURPLE_COLOR = "800080"
+
+def set_column_width(worksheet, column, width):
+    worksheet.column_dimensions[column].width = width
+
+def apply_header_style(cell, fill_color, font_color=WHITE_COLOR, is_bold=True):
+    cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+    cell.font = Font(color=font_color, bold=is_bold)
+
+def write_header(worksheet, start_row, headers, fill_color, font_color=WHITE_COLOR, is_bold=True, border=True):
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=start_row, column=col_num, value=header_text)
+        apply_header_style(cell, fill_color, font_color, is_bold)
+        if border:
+            cell.border = Border(left=Side(border_style='thin', color=BLACK_COLOR),
+                                 right=Side(border_style='thin', color=BLACK_COLOR),
+                                 top=Side(border_style='thin', color=BLACK_COLOR),
+                                 bottom=Side(border_style='thin', color=BLACK_COLOR))
+
+def merge_and_apply_style(worksheet, start_row, start_col, end_row, end_col, fill_color, font_color=WHITE_COLOR, is_bold=True):
+    cell = worksheet.cell(row=start_row, column=start_col, value='')
+    worksheet.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+    apply_header_style(cell, fill_color, font_color, is_bold)
+
+def get_status_counts(date, statuses):
+    return [Orders.objects.filter(created_at=date, status=status).count() for status in statuses]
+
+def generate_report(request):
+    # ... (existing code)
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d'), date.strftime('%A'), Orders.objects.filter(created_at=date).count()]
+
+        # Count orders for each status on that date
+        status_counts = get_status_counts(date, distinct_statuses)
+        data_row.extend(status_counts)
+
+        # Write data cells with borders
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+            cell.border = border
+            cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+    # ... (remaining code)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+def set_column_width(worksheet, column, width):
+    worksheet.column_dimensions[column].width = width
+
+def apply_header_style(cell, fill_color, font_color="FFFFFF", is_bold=True):
+    cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+    cell.font = Font(color=font_color, bold=is_bold)
+
+def write_header(worksheet, start_row, headers, fill_color, font_color="FFFFFF", is_bold=True, border=True):
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=start_row, column=col_num, value=header_text)
+        apply_header_style(cell, fill_color, font_color, is_bold)
+        if border:
+            cell.border = Border(left=Side(border_style='thin', color='000000'),
+                                 right=Side(border_style='thin', color='000000'),
+                                 top=Side(border_style='thin', color='000000'),
+                                 bottom=Side(border_style='thin', color='000000'))
+
+def merge_and_apply_style(worksheet, start_row, start_col, end_row, end_col, fill_color, font_color="FFFFFF", is_bold=True):
+    cell = worksheet.cell(row=start_row, column=start_col, value='')
+    worksheet.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+    apply_header_style(cell, fill_color, font_color, is_bold)
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Set a password to protect the workbook
+    password = "your_password_here"  # Change this to your desired password
+    workbook.security.set_workbook_password(password)
+
+    # Set column widths
+    column_widths = {'A': 15, 'B': 15, 'C': 15}
+    for col, width in column_widths.items():
+        set_column_width(worksheet, col, width)
+
+    # Apply header styling
+    write_header(worksheet, 1, ['Header1'], "000000")
+
+    header2_row = ['Date', 'Day', 'Order', 'Postclosing'] + [''] * len(distinct_statuses)
+    write_header(worksheet, 2, header2_row, "000080")
+    
+    # Merge cells for 'Date', 'Day', and 'Order'
+    for col_num, header_text in enumerate(['Date', 'Day', 'Order'], 1):
+        merge_and_apply_style(worksheet, 2, col_num, 3, col_num, "000080")
+
+    header3_row = [''] * 3 + list(distinct_statuses)
+    write_header(worksheet, 3, header3_row, "87CEFA")
+
+    # Background color for unused cells
+    unused_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+
+    # Border styling
+    border = Border(left=Side(border_style='thin', color='000000'),
+                   right=Side(border_style='thin', color='000000'),
+                   top=Side(border_style='thin', color='000000'),
+                   bottom=Side(border_style='thin', color='000000'))
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d'), date.strftime('%A'), Orders.objects.filter(created_at=date).count()]
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at=date, status=status).count()
+            data_row.append(count)
+
+        # Write data cells with borders
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+            cell.border = border
+            cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+    # Add a row at the end for totals and set the row to black color
+    total_row = ['Total', '', Orders.objects.filter(created_at__range=(start_date, end_date)).count()]
+    for status in distinct_statuses:
+        total_row.append(Orders.objects.filter(created_at__range=(start_date, end_date), status=status).count())
+
+    worksheet.append(total_row)
+    for cell in worksheet.iter_rows(min_row=worksheet.max_row, max_row=worksheet.max_row, min_col=1, max_col=len(header2_row)):
+        for c in cell:
+            c.fill = PatternFill(start_color="000000", end_color="000000", fill_type="solid")  # Black
+            c.font = Font(color="FFFFFF", bold=True)
+            c.border = border
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=worksheet.max_row + 1, max_row=worksheet.max_row + 100, min_col=1, max_col=len(header2_row)):
+        for cell in row:
+            cell.fill = unused_fill
+
+    file_path = f'F:/work/order_report_{start_date}_to_{end_date}.xlsx'  # Update this path
+
+    # Save the workbook to the specified file path
+    workbook.save(file_path)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+def set_column_width(worksheet, column, width):
+    worksheet.column_dimensions[column].width = width
+
+def apply_header_style(cell, fill_color, font_color="FFFFFF", is_bold=True):
+    cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+    cell.font = Font(color=font_color, bold=is_bold)
+
+def write_header(worksheet, start_row, headers, fill_color, font_color="FFFFFF", is_bold=True, border=True):
+    for col_num, header_text in enumerate(headers, 1):
+        cell = worksheet.cell(row=start_row, column=col_num, value=header_text)
+        apply_header_style(cell, fill_color, font_color, is_bold)
+        if border:
+            cell.border = Border(left=Side(border_style='thin', color='000000'),
+                                 right=Side(border_style='thin', color='000000'),
+                                 top=Side(border_style='thin', color='000000'),
+                                 bottom=Side(border_style='thin', color='000000'))
+
+def merge_and_apply_style(worksheet, start_row, start_col, end_row, end_col, fill_color, font_color="FFFFFF", is_bold=True):
+    cell = worksheet.cell(row=start_row, column=start_col, value='')
+    worksheet.merge_cells(start_row=start_row, start_column=start_col, end_row=end_row, end_column=end_col)
+    apply_header_style(cell, fill_color, font_color, is_bold)
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Set a password to protect the workbook
+    password = "your_password_here"  # Change this to your desired password
+    workbook.security.set_workbook_password(password)
+
+    # Set column widths
+    set_column_width(worksheet, 'A', 15)  # Date
+    set_column_width(worksheet, 'B', 15)  # Day
+    set_column_width(worksheet, 'C', 15)  # Total Orders
+
+    # Set column widths for status columns
+    for col_num in range(4, len(distinct_statuses) + 4):
+        set_column_width(worksheet, openpyxl.utils.get_column_letter(col_num), 15)
+
+    # Apply header styling
+    write_header(worksheet, 1, ['Header1'], "000000")
+
+    header2_row = ['Date', 'Day', 'Order', 'Postclosing'] + [''] * len(distinct_statuses)
+    write_header(worksheet, 2, header2_row, "000080")
+
+    merge_and_apply_style(worksheet, 2, 1, 3, 1, "000080")  # Merge cells for 'Date'
+    merge_and_apply_style(worksheet, 2, 2, 3, 2, "000080")  # Merge cells for 'Day'
+    merge_and_apply_style(worksheet, 2, 3, 3, 3, "000080")  # Merge cells for 'Order'
+
+    header3_row = [''] * 3 + list(distinct_statuses)
+    write_header(worksheet, 3, header3_row, "87CEFA")
+
+    # Background color for unused cells
+    unused_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+
+    # Border styling
+    border = Border(left=Side(border_style='thin', color='000000'),
+                   right=Side(border_style='thin', color='000000'),
+                   top=Side(border_style='thin', color='000000'),
+                   bottom=Side(border_style='thin', color='000000'))
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d'), date.strftime('%A'), Orders.objects.filter(created_at=date).count()]
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at=date, status=status).count()
+            data_row.append(count)
+
+        # Write data cells with borders
+        for col_num, value in enumerate(data_row, 1):
+            cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+            cell.border = border
+            cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+    # Add a row at the end for totals and set the row to black color
+    total_row = ['Total', '', Orders.objects.filter(created_at__range=(start_date, end_date)).count()]
+    for status in distinct_statuses:
+        total_row.append(Orders.objects.filter(created_at__range=(start_date, end_date), status=status).count())
+
+    worksheet.append(total_row)
+    for cell in worksheet.iter_rows(min_row=worksheet.max_row, max_row=worksheet.max_row, min_col=1, max_col=len(header2_row)):
+        for c in cell:
+            c.fill = PatternFill(start_color="000000", end_color="000000", fill_type="solid")  # Black
+            c.font = Font(color="FFFFFF", bold=True)
+            c.border = border
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=worksheet.max_row + 1, max_row=worksheet.max_row + 100, min_col=1, max_col=len(header2_row)):
+        for cell in row:
+            cell.fill = unused_fill
+
+    file_path = f'F:/work/order_report_{start_date}_to_{end_date}.xlsx'  # Update this path
+
+    # Save the workbook to the specified file path
+    workbook.save(file_path)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from django.http import HttpResponse
+from django.db.models import Count
+from datetime import datetime
+
+def generate_report(request):
+    # Get the parameters from the request (you may adapt this based on how you're passing the start_date and end_date)
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+
+    # Get distinct status values
+    distinct_statuses = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('status', flat=True).distinct()
+
+    # Create an Excel workbook and add a worksheet
+    workbook = openpyxl.Workbook()
+
+    # Set a password to protect the workbook
+    password = "your_password_here"  # Change this to your desired password
+    workbook.security.set_workbook_password(password)
+
+    worksheet = workbook.active
+    worksheet.title = 'Order Report'
+
+    # Set column width for better readability
+    worksheet.column_dimensions['A'].width = 15  # Date
+    worksheet.column_dimensions['B'].width = 15  # Day
+    worksheet.column_dimensions['C'].width = 15  # Total Orders
+    for col_num in range(4, len(distinct_statuses) + 4):
+        worksheet.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15  # Status columns
+
+    # Apply header styling
+    header1_fill = PatternFill(start_color="000000", end_color="000000", fill_type="solid")  # Black
+    header1_font = Font(color="FFFFFF", bold=True)
+    header2_date_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Navy Blue
+    header2_order_fill = PatternFill(start_color="000080", end_color="000080", fill_type="solid")  # Navy Blue
+    header2_postclosing_fill = PatternFill(start_color="800080", end_color="800080", fill_type="solid")  # Purple
+    header2_font = Font(color="FFFFFF", bold=True)
+    header3_fill = PatternFill(start_color="87CEFA", end_color="87CEFA", fill_type="solid")  # Light Blue
+    header3_font = Font(color="FFFFFF", bold=True)
+
+    # Background color for unused cells
+    unused_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")  # White
+
+    # Border styling
+    border = Border(left=Side(border_style='thin', color='000000'),
+                   right=Side(border_style='thin', color='000000'),
+                   top=Side(border_style='thin', color='000000'),
+                   bottom=Side(border_style='thin', color='000000'))
+
+    # Write header1 with color and merge cells
+    header1_row = ['Header1']
+    start_col = 1
+    end_col = len(distinct_statuses) + 3
+    cell = worksheet.cell(row=1, column=start_col, value=header1_row[0])
+    cell.fill = header1_fill
+    cell.font = header1_font
+    cell.border = border
+    worksheet.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+    cell.alignment = Alignment(horizontal="center")
+
+    # Write header2 with color and include Day
+    header2_row = ['Date', 'Day', 'Order', 'Postclosing'] + [''] * len(distinct_statuses)
+    for col_num in range(1, len(header2_row) + 1):
+        cell = worksheet.cell(row=2, column=col_num)
+        cell.value = header2_row[col_num - 1]
+        if 'Postclosing' in cell.value:
+            cell.fill = header2_postclosing_fill
+            cell.font = header2_font  # Set font to bold for 'Postclosing'
+            cell.alignment = Alignment(horizontal="center")
+        elif 'Date' in cell.value or 'Order' in cell.value or 'Day' in cell.value:
+            cell.fill = header2_date_fill
+            cell.font = header2_font  # Set font to bold for 'Date' and 'Order'
+            cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+
+    # Dynamically merge cells for 'Date', 'Day', and 'Order'
+    worksheet.merge_cells(start_row=2, start_column=1, end_row=3, end_column=1)  # Merge cells for 'Date'
+    worksheet.merge_cells(start_row=2, start_column=2, end_row=3, end_column=2)  # Merge cells for 'Day'
+    worksheet.merge_cells(start_row=2, start_column=3, end_row=3, end_column=3)  # Merge cells for 'Order'
+
+    # Write header3 with color
+    header3_row = [''] * 3 + list(distinct_statuses)
+    for col_num in range(4, len(header3_row) + 1):
+        cell = worksheet.cell(row=3, column=col_num)
+        cell.value = header3_row[col_num - 1]
+        cell.fill = header3_fill
+        cell.font = header3_font
+        cell.border = border
+
+    # Generate data for each date and status
+    date_range = Orders.objects.filter(created_at__range=(start_date, end_date)).values_list('created_at', flat=True).distinct()
+
+    for date in date_range:
+        data_row = [date.strftime('%Y-%m-%d'), date.strftime('%A')]  # Include the day of the week
+
+        # Count total orders for the date
+        total_orders = Orders.objects.filter(created_at=date).count()
+        data_row.append(total_orders)
+
+        # Count orders for each status on that date
+        for status in distinct_statuses:
+            count = Orders.objects.filter(created_at=date, status=status).count()
+            data_row.append(count)
+            # Write data cells with borders
+            for col_num in range(1, len(data_row) + 1):
+                cell = worksheet.cell(row=worksheet.max_row, column=col_num)
+                cell.border = border
+                cell.fill = unused_fill if cell.value is None else cell.fill  # Set background color for unused cells
+
+        worksheet.append(data_row)
+
+    # Add a row at the end for totals and set the row to black color
+    total_row = ['Total', '', Orders.objects.filter(created_at__range=(start_date, end_date)).count()]
+    for status in distinct_statuses:
+        total_row.append(Orders.objects.filter(created_at__range=(start_date, end_date), status=status).count())
+    worksheet.append(total_row)
+    for cell in worksheet.iter_rows(min_row=worksheet.max_row, max_row=worksheet.max_row, min_col=1, max_col=len(header2_row)):
+        for c in cell:
+            c.fill = header1_fill
+            c.font = header1_font
+            c.border = border
+
+    # Set background color for unused cells in the sheet
+    for row in worksheet.iter_rows(min_row=worksheet.max_row + 1, max_row=worksheet.max_row + 100, min_col=1, max_col=len(header2_row)):
+        for cell in row:
+            cell.fill = unused_fill
+
+    file_path = f'F:/work/order_report_{start_date}_to_{end_date}.xlsx'  # Update this path
+
+    # Save the workbook to the specified file path
+    workbook.save(file_path)
+
+    # Create a response with the Excel file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename=order_report_{start_date}_to_{end_date}.xlsx'
+    workbook.save(response)
+
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from django.http import HttpResponse

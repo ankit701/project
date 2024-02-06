@@ -1,5 +1,61 @@
 <!--
 
+
+
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .models import YourModel
+from .serializers import YourModelSerializer
+
+class YourModelUpdateView(APIView):
+    def put(self, request):
+        email = request.data.get('email')
+        try:
+            instance = YourModel.objects.get(email=email)
+        except YourModel.DoesNotExist:
+            return Response({"error": "User does not exist with this email"}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = YourModelSerializer(instance, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
+
+from rest_framework import serializers
+from .models import YourModel
+
+class YourModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YourModel
+        fields = ['name', 'email', 'phone_number', 'address1', 'address2']
+        read_only_fields = ['email']  # Marking email field as read-only
+
+    def update(self, instance, validated_data):
+        # Remove email from validated data if present
+        validated_data.pop('email', None)
+        return super().update(instance, validated_data)
+
+
+
+
+
+
+
+
+
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView

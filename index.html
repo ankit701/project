@@ -1,6 +1,43 @@
 <!--
 
 
+from rest_framework import serializers
+from .models import Order, OrderLog
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'customer', 'product', 'quantity', 'total_price']
+
+    def create(self, validated_data):
+        # Extract relevant data from validated_data
+        order_data = {
+            'customer': validated_data['customer'],
+            'product': validated_data['product'],
+            'quantity': validated_data['quantity'],
+            'total_price': validated_data['total_price']
+        }
+        
+        # Create order instance
+        order = Order.objects.create(**order_data)
+        
+        # Create order log instance
+        order_log_data = {
+            'order': order,
+            'status': 'Created'
+        }
+        OrderLog.objects.create(**order_log_data)
+        
+        return order
+
+
+
+
+
+
+
+
+
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import YourModel

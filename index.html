@@ -2,6 +2,55 @@
 
 
 
+from rest_framework import serializers
+from .models import Order
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'customer', 'product', 'quantity', 'total_price']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        status = self.context.get('status')
+        data['status'] = status
+        return data
+
+
+
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import Order
+from .serializers import OrderSerializer
+
+class OrderStatusView(APIView):
+    def get(self, request, status, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=404)
+
+        # Assuming you have retrieved the status value somehow
+        # status = 'SomeStatus'
+
+        serializer = OrderSerializer(order, context={'status': status})
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Order, OrderLog

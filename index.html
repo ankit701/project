@@ -1,6 +1,28 @@
 <!--
 
 
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .models import YourModel
+from .serializers import YourModelSerializer
+
+class YourModelListView(APIView):
+    def get(self, request):
+        queryset = YourModel.objects.all()
+        serializer = YourModelSerializer(queryset, many=True)
+        
+        # Modify the serialized data
+        modified_data = []
+        for data in serializer.data:
+            data['custom_id'] = f"ORD{str(data['id']).zfill(6)}"
+            modified_data.append(data)
+
+        return Response(modified_data)
+
+
+
+
+
 
 from rest_framework import status
 from rest_framework.response import Response

@@ -2,6 +2,172 @@
 
 
 
+
+
+from .models import FollowUp  # Import the FollowUp model if not already imported
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+    def update(self, instance, validated_data):
+        status = self.context.get('status')
+        if status == 'not_yet_assigned':
+            assigned_to = validated_data.get('assigned_to')
+            if assigned_to:
+                instance.assigned_to = assigned_to
+                instance.status = 'audit_in_progress'
+
+        elif status == 'manifest_pending':
+            instance.tracking_number = validated_data.get('tracking_number', instance.tracking_number)
+            instance.borrowers_first_name = validated_data.get('borrowers_first_name', instance.borrowers_first_name)
+            instance.borrowers_last_name = validated_data.get('borrowers_last_name', instance.borrowers_last_name)
+            instance.status = 'yet_to_start'
+
+            # Create a follow-up instance
+            follow_up_data = {
+                'order': instance,
+                'follow_up_reason': validated_data.get('follow_up_reason', ''),  # Add relevant fields here
+                # Add other fields as needed
+            }
+            follow_up_serializer = FollowUpSerializer(data=follow_up_data)
+            if follow_up_serializer.is_valid():
+                follow_up_serializer.save()
+            else:
+                raise serializers.ValidationError(f"Follow-up data is invalid: {follow_up_serializer.errors}")
+
+        else:
+            raise serializers.ValidationError(f"Invalid status: {status}.")
+        
+        instance.save()
+        return instance
+
+
+
+
+
+
+
+
+
+
+
+class OrdersView(generics.UpdateAPIView):
+    queryset = Order.objects.all()  # Changed from 'Orders' to 'Order'
+    serializer_class = OrderSerializer  # Corrected the serializer class name
+    lookup_field = ('order_number', 'order_status')
+
+    def get_object(self):
+        filter = {}
+        for field in self.lookup_field:
+            filter[field] = self.kwargs[field]
+        return self.queryset.get(id=filter.get('order_number')), filter.get('order_status')
+
+    def update(self, request, *args, **kwargs):
+        instance, status = self.get_object()
+        # Check if instance is None (order not found or invalid status)
+        if instance is None:
+            return Response({"error": "Invalid order_number or status."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True, context={'status': status})
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_update(serializer)
+        except serializers.ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+    def update(self, instance, validated_data):
+        status = self.context.get('status')  # Retrieve status from context
+        if status == 'not_yet_assigned':
+            assigned_to = validated_data.get('assigned_to')
+            if assigned_to:
+                instance.assigned_to = assigned_to
+                instance.status = 'audit_in_progress'
+
+        elif status == 'manifest_pending':
+            instance.tracking_number = validated_data.get('tracking_number', instance.tracking_number)
+            instance.borrowers_first_name = validated_data.get('borrowers_first_name', instance.borrowers_first_name)
+            instance.borrowers_last_name = validated_data.get('borrowers_last_name', instance.borrowers_last_name)
+            instance.status = 'yet_to_start'
+
+        else:
+            raise serializers.ValidationError(f"Invalid status: {status}.")
+        
+        instance.save()
+        return instance
+
+
+
+
+
+
+
+
+
+
+
+
+
+class OrdersView(generics.UpdateAPIView):
+    queryset = Orders.objects.all()
+    serializer_class = OrdersSerializer
+    lookup_field = ('order_number', 'order_status')
+
+    def get_object(self):
+        filter = {}
+        for field in self.lookup_field:
+            filter[field] = self.kwargs[field]
+        return self.queryset.get(id=filter.get('order_number')), filter.get('order_status')
+
+    def update(self, request, *args, **kwargs):
+        instance, status = self.get_object()
+        # Check if instance is None (order not found or invalid status)
+        if instance is None:
+            return Response({"error": "Invalid order_number or status."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True, context={'status': status})
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_update(serializer)
+        except serializers.ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+
+
+
+
 from rest_framework import serializers
 from .models import Order
 

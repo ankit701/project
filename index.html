@@ -2,6 +2,30 @@
 
 
 
+from django.db.models import Max
+from rest_framework import serializers
+from .models import Coverage
+
+class CoverageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coverage
+        fields = ['id', 'search_fee', 'vendor_id', 'created_at']
+
+def get_latest_coverages():
+    latest_coverages = Coverage.objects.values('vendor_id').annotate(latest_created_at=Max('created_at'))
+    latest_coverage_ids = [coverage['id'] for coverage in latest_coverages]
+    latest_coverages_data = Coverage.objects.filter(id__in=latest_coverage_ids)
+    serializer = CoverageSerializer(latest_coverages_data, many=True)
+    return serializer.data
+
+
+
+
+
+
+
+
+
 
 
 from .models import FollowUp  # Import the FollowUp model if not already imported

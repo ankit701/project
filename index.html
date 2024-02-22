@@ -1,6 +1,92 @@
 <!--
 
 
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.contrib.auth.models import User
+from .models import YourModel
+from .serializers import YourModelSerializer
+
+class UpdateEmployee(APIView):
+    def post(self, request, employee_id):
+        # Get data from request
+        reporting_manager_id = request.data.get('reporting_manager')
+
+        # Validate reporting_manager_id
+        try:
+            reporting_manager = User.objects.get(id=reporting_manager_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Reporting manager does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve and update employee instance
+        try:
+            employee = YourModel.objects.get(id=employee_id)
+        except YourModel.DoesNotExist:
+            return Response({'error': 'Employee does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update employee instance with new data
+        request.data['reporting_manager'] = reporting_manager_id  # Update reporting_manager with ID
+        serializer = YourModelSerializer(employee, data=request.data, partial=True)  # Use partial=True for partial updates
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
+
+
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.contrib.auth.models import User
+from .models import YourModel
+from .serializers import YourModelSerializer
+
+class UpdateEmployee(APIView):
+    def post(self, request, employee_id):
+        # Get data from request
+        reporting_manager_id = request.data.get('reporting_manager')
+
+        # Validate reporting_manager_id
+        try:
+            reporting_manager = User.objects.get(id=reporting_manager_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Reporting manager does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve and update employee instance
+        try:
+            employee = YourModel.objects.get(id=employee_id)
+        except YourModel.DoesNotExist:
+            return Response({'error': 'Employee does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update employee instance with new data
+        data = request.data.copy()
+        data['reporting_manager'] = reporting_manager_id  # Update reporting_manager with ID
+        serializer = YourModelSerializer(employee, data=data, partial=True)  # Use partial=True for partial updates
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
 
 from django.db.models import Max
 from rest_framework import serializers

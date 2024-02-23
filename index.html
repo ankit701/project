@@ -1,6 +1,138 @@
 <!--
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# urls.py
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    # Your existing URL patterns
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+
+
+
+
+# settings.py
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
+
+
+
+
+
+
+
+
+
+
+
+
+from rest_framework import serializers
+from .models import Order, UploadedFile
+
+class UploadedFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UploadedFile
+        fields = '__all__'
+
+class OrderSerializer(serializers.ModelSerializer):
+    uploaded_files = UploadedFileSerializer(many=True, required=False)
+
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+    def create(self, validated_data):
+        uploaded_files_data = validated_data.pop('uploaded_files', [])
+        order = Order.objects.create(**validated_data)
+        for uploaded_file_data in uploaded_files_data:
+            UploadedFile.objects.create(order=order, **uploaded_file_data)
+        return order
+
+    def update(self, instance, validated_data):
+        uploaded_files_data = validated_data.pop('uploaded_files', [])
+        instance = super().update(instance, validated_data)
+        for uploaded_file_data in uploaded_files_data:
+            uploaded_file_id = uploaded_file_data.get('id')
+            if uploaded_file_id:
+                uploaded_file = UploadedFile.objects.get(id=uploaded_file_id)
+                uploaded_file.file = uploaded_file_data.get('file', uploaded_file.file)
+                uploaded_file.save()
+            else:
+                UploadedFile.objects.create(order=instance, **uploaded_file_data)
+        return instance
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+from django.db import models
+from django.contrib.auth.models import User
+
+def get_file_extension(filename):
+    return os.path.splitext(filename)[-1]
+
+class Order(models.Model):
+    # Define your Order model fields here
+    # For example:
+    order_number = models.CharField(max_length=100)
+    # Add other fields as needed
+
+class UploadedFile(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='documents/')
+    extension = models.CharField(max_length=10, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.extension:
+            self.extension = get_file_extension(self.file.name)
+        super().save(*args, **kwargs)
+
+
+
+
+
+
+
+
+
+
+
+
+
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
